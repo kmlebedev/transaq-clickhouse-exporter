@@ -5,4 +5,4 @@
 
 ## Description
 
-gRPC клиент от [txmlconnector`а](https://github.com/kmlebedev/txmlconnector) для экспорда данных торгов ММВБ в базу данных [ClickHouse](https://clickhouse.com/)
+gRPC клиент от [txmlconnector`а](https://github.com/kmlebedev/txmlconnector) для экспорта данных торгов ММВБ в базу данных [ClickHouse](https://clickhouse.com/)
