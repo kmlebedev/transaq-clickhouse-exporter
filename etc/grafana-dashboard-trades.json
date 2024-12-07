@@ -1,0 +1,3898 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "https://clickhouse.com/blog/working-with-time-series-data-and-functions-ClickHouse",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 3,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 14,
+      "panels": [],
+      "title": "Итоги дня",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "grafana-clickhouse-datasource",
+        "uid": "bdx7lxrdelxq8b"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "dark-green",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyRUB"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "id": 12,
+      "options": {
+        "displayMode": "basic",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "hide": true,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "table",
+          "rawSql": "SELECT sec_code, sum(vol) as \"разница объемов\" FROM (\n  SELECT toStartOfInterval(time, INTERVAL ${interval} MINUTE) as \"minute\", sec_code, if(buy_sell == 'S', -1, 1) * sum(price * quantity * s.lotsize) as \"vol\"\n  FROM \"default\".\"transaq_trades\" JOIN default.transaq_securities s on (transaq_trades.sec_code = s.seccode and transaq_trades.board = s.board)\n  WHERE sec_code not in [$sec_code_etf] AND board = 'TQBR' AND ( minute >= $__fromTime AND minute <= $__toTime )\n  GROUP by \"minute\", sec_code, buy_sell)\nGROUP by sec_code\nHAVING \"разница объемов\" > 0\nORDER by \"разница объемов\" desc\nLIMIT 10",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "table",
+          "rawSql": "select sec_code, sum(vol) as vol FROM (\n SELECT sec_code, sum(price * quantity * s.lotsize) as vol\n FROM \"default\".\"transaq_trades\"\n          JOIN default.transaq_securities s\n               on (transaq_trades.secid = s.secid and transaq_trades.board = s.board)\n WHERE sec_code not in [$sec_code_etf]\n   AND board = 'TQBR'\n   AND (time >= $__fromTime AND time <= $__toTime)\n   AND (buy_sell = 'B')\n GROUP By sec_code    \n UNION ALL\n SELECT sec_code, sum(price * quantity * s.lotsize)*-1 as vol\n FROM \"default\".\"transaq_trades\"\n          JOIN default.transaq_securities s\n               on (transaq_trades.secid = s.secid and transaq_trades.board = s.board)\n WHERE sec_code not in [$sec_code_etf] AND board = 'TQBR'\n   AND (time >= $__fromTime AND time <= $__toTime)\n   AND (buy_sell = 'S')\n GROUP By sec_code  \n ) GROUP by sec_code ORDER by vol desc LIMIT 10\n",
+          "refId": "B"
+        }
+      ],
+      "title": "Нетто покупки в IMOEX",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "grafana-clickhouse-datasource",
+        "uid": "bdx7lxrdelxq8b"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "semi-dark-red",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyRUB"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 13,
+      "options": {
+        "displayMode": "basic",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [],
+          "fields": "",
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "11.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "columns": [],
+              "database": "",
+              "limit": 1000,
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "table",
+          "rawSql": "select sec_code, sum(vol)*-1 as vol FROM (\n  SELECT sec_code, sum(price * quantity * s.lotsize) as vol\n  FROM \"default\".\"transaq_trades\" JOIN default.transaq_securities s on (transaq_trades.secid = s.secid and transaq_trades.board = s.board)\n  WHERE sec_code not in [$sec_code_etf]\n    AND board = 'TQBR'\n    AND (time >= $__fromTime AND time <= $__toTime)\n    AND (buy_sell = 'B')\n  GROUP By sec_code \n  UNION ALL\n  SELECT sec_code, sum(price * quantity * s.lotsize)*-1 as vol\n  FROM \"default\".\"transaq_trades\" JOIN default.transaq_securities s on (transaq_trades.secid = s.secid and transaq_trades.board = s.board)\n  WHERE sec_code not in [$sec_code_etf] AND board = 'TQBR'\n    AND (time >= $__fromTime AND time <= $__toTime)\n    AND (buy_sell = 'S')\n  GROUP By sec_code  \n ) GROUP by sec_code ORDER by vol desc LIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Нетто продажи в IMOEX",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 9,
+      "panels": [
+        {
+          "datasource": {
+            "default": true,
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": [
+              {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                  "id": "byNames",
+                  "options": {
+                    "mode": "exclude",
+                    "names": [
+                      "vol"
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                  }
+                },
+                "properties": [
+                  {
+                    "id": "custom.hideFrom",
+                    "value": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 2
+          },
+          "id": 10,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.97,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [
+                "p50"
+              ],
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "sortBy": "50th %",
+              "sortDesc": true
+            },
+            "orientation": "auto",
+            "showValue": "auto",
+            "stacking": "none",
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            },
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "pluginVersion": "11.2.0",
+          "targets": [
+            {
+              "builderOptions": {
+                "columns": [],
+                "database": "default",
+                "limit": 1000,
+                "meta": {},
+                "mode": "list",
+                "queryType": "table",
+                "table": "candles"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "meta": {
+                "builderOptions": {
+                  "columns": [],
+                  "database": "default",
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "list",
+                  "queryType": "table",
+                  "table": "candles"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT time, topK(10)(sec_code) as \"sec\", sum(quantity) as \"vol\"\nFROM \"default\".\"transaq_trades\"\nWHERE quantity = 1 AND buy_sell = 'B' AND ( time >= $__fromTime AND time <= $__toTime )\nGROUP by time, sec_code\nHAVING vol > 1\nORDER BY time",
+              "refId": "Покупки"
+            }
+          ],
+          "title": "Айсберги",
+          "type": "barchart"
+        }
+      ],
+      "title": "Volume anomalies",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 8,
+      "panels": [
+        {
+          "datasource": {
+            "default": true,
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": true,
+                "axisColorMode": "series",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.5,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "hue",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "smooth",
+                "lineWidth": 1,
+                "pointSize": 4,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "dashed"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 0
+                  }
+                ]
+              },
+              "unit": "currencyRUB"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Нетто вчера разница объемов"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  },
+                  {
+                    "id": "custom.lineStyle",
+                    "value": {
+                      "dash": [
+                        10,
+                        10
+                      ],
+                      "fill": "dash"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 12
+          },
+          "id": 3,
+          "interval": "${interval}m",
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum",
+                "mean"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "builderOptions": {
+                "aggregates": [],
+                "columns": [
+                  {
+                    "alias": "sec_code",
+                    "custom": false,
+                    "name": "sec_code",
+                    "type": "LowCardinality(FixedString(16))"
+                  },
+                  {
+                    "alias": "pice",
+                    "custom": false,
+                    "name": "pice",
+                    "type": "Float32"
+                  },
+                  {
+                    "alias": "quantity",
+                    "custom": false,
+                    "name": "quantity",
+                    "type": "UInt32"
+                  },
+                  {
+                    "hint": "time",
+                    "name": "time",
+                    "type": "DateTime"
+                  }
+                ],
+                "database": "default",
+                "filters": [
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "hint": "time",
+                    "key": "",
+                    "operator": "WITH IN DASHBOARD TIME RANGE",
+                    "type": "datetime"
+                  },
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "key": "buy_sell",
+                    "label": "buy_sell",
+                    "operator": "=",
+                    "type": "LowCardinality(FixedString(1))",
+                    "value": "B"
+                  }
+                ],
+                "groupBy": [],
+                "limit": 1000,
+                "meta": {},
+                "mode": "aggregate",
+                "orderBy": [
+                  {
+                    "default": true,
+                    "dir": "ASC",
+                    "hint": "time",
+                    "name": ""
+                  }
+                ],
+                "queryType": "timeseries",
+                "table": "transaq_trades"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "meta": {
+                "builderOptions": {
+                  "aggregates": [],
+                  "columns": [
+                    {
+                      "alias": "sec_code",
+                      "custom": false,
+                      "name": "sec_code",
+                      "type": "LowCardinality(FixedString(16))"
+                    },
+                    {
+                      "alias": "pice",
+                      "custom": false,
+                      "name": "pice",
+                      "type": "Float32"
+                    },
+                    {
+                      "alias": "quantity",
+                      "custom": false,
+                      "name": "quantity",
+                      "type": "UInt32"
+                    },
+                    {
+                      "hint": "time",
+                      "name": "time",
+                      "type": "DateTime"
+                    }
+                  ],
+                  "database": "default",
+                  "filters": [
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "hint": "time",
+                      "key": "",
+                      "operator": "WITH IN DASHBOARD TIME RANGE",
+                      "type": "datetime"
+                    },
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "key": "buy_sell",
+                      "label": "buy_sell",
+                      "operator": "=",
+                      "type": "LowCardinality(FixedString(1))",
+                      "value": "B"
+                    }
+                  ],
+                  "groupBy": [],
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "aggregate",
+                  "orderBy": [
+                    {
+                      "default": true,
+                      "dir": "ASC",
+                      "hint": "time",
+                      "name": ""
+                    }
+                  ],
+                  "queryType": "timeseries",
+                  "table": "transaq_trades"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT minute , sum(vol) as \"разница объемов\" FROM (\n  SELECT toStartOfInterval(time, INTERVAL ${interval} MINUTE) as \"minute\", if(buy_sell == 'S', -1, 1) * sum(price * quantity * s.lotsize) as \"vol\"\n  FROM \"default\".\"transaq_trades\" JOIN default.transaq_securities s on (transaq_trades.sec_code = s.seccode and transaq_trades.board = s.board)\n  WHERE sec_code in [$sec_code] AND board = 'TQBR' AND ( minute >= $__fromTime AND minute <= $__toTime )\n  GROUP by \"minute\", buy_sell)\nGROUP by \"minute\"\nORDER BY minute",
+              "refId": "Нетто"
+            },
+            {
+              "builderOptions": {
+                "aggregates": [],
+                "columns": [
+                  {
+                    "alias": "sec_code",
+                    "custom": false,
+                    "name": "sec_code",
+                    "type": "LowCardinality(FixedString(16))"
+                  },
+                  {
+                    "alias": "buy_sell",
+                    "custom": false,
+                    "name": "buy_sell",
+                    "type": "LowCardinality(FixedString(1))"
+                  },
+                  {
+                    "alias": "pice",
+                    "custom": false,
+                    "name": "pice",
+                    "type": "Float32"
+                  },
+                  {
+                    "alias": "quantity",
+                    "custom": false,
+                    "name": "quantity",
+                    "type": "UInt32"
+                  },
+                  {
+                    "hint": "time",
+                    "name": "time",
+                    "type": "DateTime"
+                  }
+                ],
+                "database": "default",
+                "filters": [
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "hint": "time",
+                    "key": "",
+                    "operator": "WITH IN DASHBOARD TIME RANGE",
+                    "type": "datetime"
+                  },
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "key": "buy_sell",
+                    "label": "buy_sell",
+                    "operator": "=",
+                    "type": "LowCardinality(FixedString(1))",
+                    "value": "S"
+                  }
+                ],
+                "groupBy": [],
+                "limit": 1000,
+                "meta": {},
+                "mode": "aggregate",
+                "orderBy": [
+                  {
+                    "default": true,
+                    "dir": "ASC",
+                    "hint": "time",
+                    "name": ""
+                  }
+                ],
+                "queryType": "timeseries",
+                "table": "transaq_trades"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "hide": false,
+              "meta": {
+                "builderOptions": {
+                  "aggregates": [],
+                  "columns": [
+                    {
+                      "alias": "sec_code",
+                      "custom": false,
+                      "name": "sec_code",
+                      "type": "LowCardinality(FixedString(16))"
+                    },
+                    {
+                      "alias": "buy_sell",
+                      "custom": false,
+                      "name": "buy_sell",
+                      "type": "LowCardinality(FixedString(1))"
+                    },
+                    {
+                      "alias": "pice",
+                      "custom": false,
+                      "name": "pice",
+                      "type": "Float32"
+                    },
+                    {
+                      "alias": "quantity",
+                      "custom": false,
+                      "name": "quantity",
+                      "type": "UInt32"
+                    },
+                    {
+                      "hint": "time",
+                      "name": "time",
+                      "type": "DateTime"
+                    }
+                  ],
+                  "database": "default",
+                  "filters": [
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "hint": "time",
+                      "key": "",
+                      "operator": "WITH IN DASHBOARD TIME RANGE",
+                      "type": "datetime"
+                    },
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "key": "buy_sell",
+                      "label": "buy_sell",
+                      "operator": "=",
+                      "type": "LowCardinality(FixedString(1))",
+                      "value": "S"
+                    }
+                  ],
+                  "groupBy": [],
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "aggregate",
+                  "orderBy": [
+                    {
+                      "default": true,
+                      "dir": "ASC",
+                      "hint": "time",
+                      "name": ""
+                    }
+                  ],
+                  "queryType": "timeseries",
+                  "table": "transaq_trades"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT minute , sum(vol) as \"разница объемов\" FROM (\n  SELECT toStartOfInterval(timestamp_add(day, 1, time), INTERVAL ${interval} MINUTE) as \"minute\", if(buy_sell == 'S', -1, 1) * sum(price * quantity * s.lotsize) as \"vol\"\n  FROM \"default\".\"transaq_trades\" JOIN default.transaq_securities s on (transaq_trades.sec_code = s.seccode and transaq_trades.board = s.board)\n  WHERE sec_code in [$sec_code] AND board = 'TQBR' AND ( minute >= $__fromTime AND minute <= $__toTime )\n  GROUP by \"minute\", buy_sell)\nGROUP by \"minute\"\nORDER BY minute",
+              "refId": "Нетто вчера"
+            }
+          ],
+          "title": "Volume trades $sec_code by interval $interval в минутах",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "default": true,
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": true,
+                "axisColorMode": "series",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.5,
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "gradientMode": "hue",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 4,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 0
+                  }
+                ]
+              },
+              "unit": "currencyRUB"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sell vol"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Buy vol"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Продажи объем"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 12
+          },
+          "id": 15,
+          "interval": "${interval}m",
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum",
+                "mean"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "builderOptions": {
+                "aggregates": [],
+                "columns": [
+                  {
+                    "alias": "sec_code",
+                    "custom": false,
+                    "name": "sec_code",
+                    "type": "LowCardinality(FixedString(16))"
+                  },
+                  {
+                    "alias": "pice",
+                    "custom": false,
+                    "name": "pice",
+                    "type": "Float32"
+                  },
+                  {
+                    "alias": "quantity",
+                    "custom": false,
+                    "name": "quantity",
+                    "type": "UInt32"
+                  },
+                  {
+                    "hint": "time",
+                    "name": "time",
+                    "type": "DateTime"
+                  }
+                ],
+                "database": "default",
+                "filters": [
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "hint": "time",
+                    "key": "",
+                    "operator": "WITH IN DASHBOARD TIME RANGE",
+                    "type": "datetime"
+                  },
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "key": "buy_sell",
+                    "label": "buy_sell",
+                    "operator": "=",
+                    "type": "LowCardinality(FixedString(1))",
+                    "value": "B"
+                  }
+                ],
+                "groupBy": [],
+                "limit": 1000,
+                "meta": {},
+                "mode": "aggregate",
+                "orderBy": [
+                  {
+                    "default": true,
+                    "dir": "ASC",
+                    "hint": "time",
+                    "name": ""
+                  }
+                ],
+                "queryType": "timeseries",
+                "table": "transaq_trades"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "meta": {
+                "builderOptions": {
+                  "aggregates": [],
+                  "columns": [
+                    {
+                      "alias": "sec_code",
+                      "custom": false,
+                      "name": "sec_code",
+                      "type": "LowCardinality(FixedString(16))"
+                    },
+                    {
+                      "alias": "pice",
+                      "custom": false,
+                      "name": "pice",
+                      "type": "Float32"
+                    },
+                    {
+                      "alias": "quantity",
+                      "custom": false,
+                      "name": "quantity",
+                      "type": "UInt32"
+                    },
+                    {
+                      "hint": "time",
+                      "name": "time",
+                      "type": "DateTime"
+                    }
+                  ],
+                  "database": "default",
+                  "filters": [
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "hint": "time",
+                      "key": "",
+                      "operator": "WITH IN DASHBOARD TIME RANGE",
+                      "type": "datetime"
+                    },
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "key": "buy_sell",
+                      "label": "buy_sell",
+                      "operator": "=",
+                      "type": "LowCardinality(FixedString(1))",
+                      "value": "B"
+                    }
+                  ],
+                  "groupBy": [],
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "aggregate",
+                  "orderBy": [
+                    {
+                      "default": true,
+                      "dir": "ASC",
+                      "hint": "time",
+                      "name": ""
+                    }
+                  ],
+                  "queryType": "timeseries",
+                  "table": "transaq_trades"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT toStartOfInterval(time, INTERVAL $interval MINUTE) as \"minute\", sum(price * quantity * s.lotsize) as \"объем\" FROM \"default\".\"transaq_trades\" \nJOIN default.transaq_securities s on (transaq_trades.secid = s.secid and transaq_trades.board = s.board)\nWHERE sec_code in [$sec_code] AND board = 'TQBR' AND ( minute >= $__fromTime AND minute <= $__toTime ) AND ( buy_sell = 'B' ) GROUP by \"minute\" ORDER BY minute",
+              "refId": "Покупки"
+            },
+            {
+              "builderOptions": {
+                "aggregates": [],
+                "columns": [
+                  {
+                    "alias": "sec_code",
+                    "custom": false,
+                    "name": "sec_code",
+                    "type": "LowCardinality(FixedString(16))"
+                  },
+                  {
+                    "alias": "buy_sell",
+                    "custom": false,
+                    "name": "buy_sell",
+                    "type": "LowCardinality(FixedString(1))"
+                  },
+                  {
+                    "alias": "pice",
+                    "custom": false,
+                    "name": "pice",
+                    "type": "Float32"
+                  },
+                  {
+                    "alias": "quantity",
+                    "custom": false,
+                    "name": "quantity",
+                    "type": "UInt32"
+                  },
+                  {
+                    "hint": "time",
+                    "name": "time",
+                    "type": "DateTime"
+                  }
+                ],
+                "database": "default",
+                "filters": [
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "hint": "time",
+                    "key": "",
+                    "operator": "WITH IN DASHBOARD TIME RANGE",
+                    "type": "datetime"
+                  },
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "key": "buy_sell",
+                    "label": "buy_sell",
+                    "operator": "=",
+                    "type": "LowCardinality(FixedString(1))",
+                    "value": "S"
+                  }
+                ],
+                "groupBy": [],
+                "limit": 1000,
+                "meta": {},
+                "mode": "aggregate",
+                "orderBy": [
+                  {
+                    "default": true,
+                    "dir": "ASC",
+                    "hint": "time",
+                    "name": ""
+                  }
+                ],
+                "queryType": "timeseries",
+                "table": "transaq_trades"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "hide": false,
+              "meta": {
+                "builderOptions": {
+                  "aggregates": [],
+                  "columns": [
+                    {
+                      "alias": "sec_code",
+                      "custom": false,
+                      "name": "sec_code",
+                      "type": "LowCardinality(FixedString(16))"
+                    },
+                    {
+                      "alias": "buy_sell",
+                      "custom": false,
+                      "name": "buy_sell",
+                      "type": "LowCardinality(FixedString(1))"
+                    },
+                    {
+                      "alias": "pice",
+                      "custom": false,
+                      "name": "pice",
+                      "type": "Float32"
+                    },
+                    {
+                      "alias": "quantity",
+                      "custom": false,
+                      "name": "quantity",
+                      "type": "UInt32"
+                    },
+                    {
+                      "hint": "time",
+                      "name": "time",
+                      "type": "DateTime"
+                    }
+                  ],
+                  "database": "default",
+                  "filters": [
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "hint": "time",
+                      "key": "",
+                      "operator": "WITH IN DASHBOARD TIME RANGE",
+                      "type": "datetime"
+                    },
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "key": "buy_sell",
+                      "label": "buy_sell",
+                      "operator": "=",
+                      "type": "LowCardinality(FixedString(1))",
+                      "value": "S"
+                    }
+                  ],
+                  "groupBy": [],
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "aggregate",
+                  "orderBy": [
+                    {
+                      "default": true,
+                      "dir": "ASC",
+                      "hint": "time",
+                      "name": ""
+                    }
+                  ],
+                  "queryType": "timeseries",
+                  "table": "transaq_trades"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT toStartOfInterval(time, INTERVAL $interval MINUTE) as \"minute\", sum(price * quantity * s.lotsize) * -1 as \"объем\" \nFROM \"default\".\"transaq_trades\"\nJOIN default.transaq_securities s on (transaq_trades.secid = s.secid and transaq_trades.board = s.board)\nWHERE sec_code in [$sec_code] AND board = 'TQBR' AND ( minute >= $__fromTime AND minute <= $__toTime ) AND ( buy_sell = 'S' ) GROUP by minute ORDER BY minute",
+              "refId": "Продажи"
+            }
+          ],
+          "title": "Volume trades $sec_code by interval $interval в минутах",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "default": true,
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.1,
+                "drawStyle": "bars",
+                "fillOpacity": 0,
+                "gradientMode": "hue",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 10,
+                "pointSize": 7,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sell vol"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Продажи лот"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 20
+          },
+          "id": 1,
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "builderOptions": {
+                "aggregates": [],
+                "columns": [
+                  {
+                    "alias": "sec_code",
+                    "custom": false,
+                    "name": "sec_code",
+                    "type": "LowCardinality(FixedString(16))"
+                  },
+                  {
+                    "alias": "pice",
+                    "custom": false,
+                    "name": "pice",
+                    "type": "Float32"
+                  },
+                  {
+                    "alias": "quantity",
+                    "custom": false,
+                    "name": "quantity",
+                    "type": "UInt32"
+                  },
+                  {
+                    "hint": "time",
+                    "name": "time",
+                    "type": "DateTime"
+                  }
+                ],
+                "database": "default",
+                "filters": [
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "hint": "time",
+                    "key": "",
+                    "operator": "WITH IN DASHBOARD TIME RANGE",
+                    "type": "datetime"
+                  },
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "key": "buy_sell",
+                    "label": "buy_sell",
+                    "operator": "=",
+                    "type": "LowCardinality(FixedString(1))",
+                    "value": "B"
+                  }
+                ],
+                "groupBy": [],
+                "limit": 1000,
+                "meta": {},
+                "mode": "aggregate",
+                "orderBy": [
+                  {
+                    "default": true,
+                    "dir": "ASC",
+                    "hint": "time",
+                    "name": ""
+                  }
+                ],
+                "queryType": "timeseries",
+                "table": "transaq_trades"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "meta": {
+                "builderOptions": {
+                  "aggregates": [],
+                  "columns": [
+                    {
+                      "alias": "sec_code",
+                      "custom": false,
+                      "name": "sec_code",
+                      "type": "LowCardinality(FixedString(16))"
+                    },
+                    {
+                      "alias": "pice",
+                      "custom": false,
+                      "name": "pice",
+                      "type": "Float32"
+                    },
+                    {
+                      "alias": "quantity",
+                      "custom": false,
+                      "name": "quantity",
+                      "type": "UInt32"
+                    },
+                    {
+                      "hint": "time",
+                      "name": "time",
+                      "type": "DateTime"
+                    }
+                  ],
+                  "database": "default",
+                  "filters": [
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "hint": "time",
+                      "key": "",
+                      "operator": "WITH IN DASHBOARD TIME RANGE",
+                      "type": "datetime"
+                    },
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "key": "buy_sell",
+                      "label": "buy_sell",
+                      "operator": "=",
+                      "type": "LowCardinality(FixedString(1))",
+                      "value": "B"
+                    }
+                  ],
+                  "groupBy": [],
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "aggregate",
+                  "orderBy": [
+                    {
+                      "default": true,
+                      "dir": "ASC",
+                      "hint": "time",
+                      "name": ""
+                    }
+                  ],
+                  "queryType": "timeseries",
+                  "table": "transaq_trades"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT time, sum(quantity) as \"лот\" FROM \"default\".\"transaq_trades\" WHERE sec_code in [$sec_code] AND ( time >= $__fromTime AND time <= $__toTime ) AND ( buy_sell = 'B' ) GROUP BY time ORDER BY time ASC",
+              "refId": "Покупки"
+            },
+            {
+              "builderOptions": {
+                "aggregates": [],
+                "columns": [
+                  {
+                    "alias": "sec_code",
+                    "custom": false,
+                    "name": "sec_code",
+                    "type": "LowCardinality(FixedString(16))"
+                  },
+                  {
+                    "alias": "buy_sell",
+                    "custom": false,
+                    "name": "buy_sell",
+                    "type": "LowCardinality(FixedString(1))"
+                  },
+                  {
+                    "alias": "pice",
+                    "custom": false,
+                    "name": "pice",
+                    "type": "Float32"
+                  },
+                  {
+                    "alias": "quantity",
+                    "custom": false,
+                    "name": "quantity",
+                    "type": "UInt32"
+                  },
+                  {
+                    "hint": "time",
+                    "name": "time",
+                    "type": "DateTime"
+                  }
+                ],
+                "database": "default",
+                "filters": [
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "hint": "time",
+                    "key": "",
+                    "operator": "WITH IN DASHBOARD TIME RANGE",
+                    "type": "datetime"
+                  },
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "key": "buy_sell",
+                    "label": "buy_sell",
+                    "operator": "=",
+                    "type": "LowCardinality(FixedString(1))",
+                    "value": "S"
+                  }
+                ],
+                "groupBy": [],
+                "limit": 1000,
+                "meta": {},
+                "mode": "aggregate",
+                "orderBy": [
+                  {
+                    "default": true,
+                    "dir": "ASC",
+                    "hint": "time",
+                    "name": ""
+                  }
+                ],
+                "queryType": "timeseries",
+                "table": "transaq_trades"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "hide": false,
+              "meta": {
+                "builderOptions": {
+                  "aggregates": [],
+                  "columns": [
+                    {
+                      "alias": "sec_code",
+                      "custom": false,
+                      "name": "sec_code",
+                      "type": "LowCardinality(FixedString(16))"
+                    },
+                    {
+                      "alias": "buy_sell",
+                      "custom": false,
+                      "name": "buy_sell",
+                      "type": "LowCardinality(FixedString(1))"
+                    },
+                    {
+                      "alias": "pice",
+                      "custom": false,
+                      "name": "pice",
+                      "type": "Float32"
+                    },
+                    {
+                      "alias": "quantity",
+                      "custom": false,
+                      "name": "quantity",
+                      "type": "UInt32"
+                    },
+                    {
+                      "hint": "time",
+                      "name": "time",
+                      "type": "DateTime"
+                    }
+                  ],
+                  "database": "default",
+                  "filters": [
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "hint": "time",
+                      "key": "",
+                      "operator": "WITH IN DASHBOARD TIME RANGE",
+                      "type": "datetime"
+                    },
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "key": "buy_sell",
+                      "label": "buy_sell",
+                      "operator": "=",
+                      "type": "LowCardinality(FixedString(1))",
+                      "value": "S"
+                    }
+                  ],
+                  "groupBy": [],
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "aggregate",
+                  "orderBy": [
+                    {
+                      "default": true,
+                      "dir": "ASC",
+                      "hint": "time",
+                      "name": ""
+                    }
+                  ],
+                  "queryType": "timeseries",
+                  "table": "transaq_trades"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT time, sum(quantity)*-1 as \"лот\" FROM \"default\".\"transaq_trades\" WHERE sec_code in [$sec_code] AND ( time >= $__fromTime AND time <= $__toTime ) AND ( buy_sell = 'S' ) GROUP BY time ORDER BY time ASC",
+              "refId": "Продажи"
+            }
+          ],
+          "title": "Volume trades $sec_code в лотах",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "default": true,
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.1,
+                "drawStyle": "bars",
+                "fillOpacity": 0,
+                "gradientMode": "hue",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 10,
+                "pointSize": 7,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sell vol"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sell count"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 20
+          },
+          "id": 2,
+          "options": {
+            "legend": {
+              "calcs": [
+                "sum"
+              ],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "builderOptions": {
+                "aggregates": [],
+                "columns": [
+                  {
+                    "alias": "sec_code",
+                    "custom": false,
+                    "name": "sec_code",
+                    "type": "LowCardinality(FixedString(16))"
+                  },
+                  {
+                    "alias": "pice",
+                    "custom": false,
+                    "name": "pice",
+                    "type": "Float32"
+                  },
+                  {
+                    "alias": "quantity",
+                    "custom": false,
+                    "name": "quantity",
+                    "type": "UInt32"
+                  },
+                  {
+                    "hint": "time",
+                    "name": "time",
+                    "type": "DateTime"
+                  }
+                ],
+                "database": "default",
+                "filters": [
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "hint": "time",
+                    "key": "",
+                    "operator": "WITH IN DASHBOARD TIME RANGE",
+                    "type": "datetime"
+                  },
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "key": "buy_sell",
+                    "label": "buy_sell",
+                    "operator": "=",
+                    "type": "LowCardinality(FixedString(1))",
+                    "value": "B"
+                  }
+                ],
+                "groupBy": [],
+                "limit": 1000,
+                "meta": {},
+                "mode": "aggregate",
+                "orderBy": [
+                  {
+                    "default": true,
+                    "dir": "ASC",
+                    "hint": "time",
+                    "name": ""
+                  }
+                ],
+                "queryType": "timeseries",
+                "table": "transaq_trades"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "meta": {
+                "builderOptions": {
+                  "aggregates": [],
+                  "columns": [
+                    {
+                      "alias": "sec_code",
+                      "custom": false,
+                      "name": "sec_code",
+                      "type": "LowCardinality(FixedString(16))"
+                    },
+                    {
+                      "alias": "pice",
+                      "custom": false,
+                      "name": "pice",
+                      "type": "Float32"
+                    },
+                    {
+                      "alias": "quantity",
+                      "custom": false,
+                      "name": "quantity",
+                      "type": "UInt32"
+                    },
+                    {
+                      "hint": "time",
+                      "name": "time",
+                      "type": "DateTime"
+                    }
+                  ],
+                  "database": "default",
+                  "filters": [
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "hint": "time",
+                      "key": "",
+                      "operator": "WITH IN DASHBOARD TIME RANGE",
+                      "type": "datetime"
+                    },
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "key": "buy_sell",
+                      "label": "buy_sell",
+                      "operator": "=",
+                      "type": "LowCardinality(FixedString(1))",
+                      "value": "B"
+                    }
+                  ],
+                  "groupBy": [],
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "aggregate",
+                  "orderBy": [
+                    {
+                      "default": true,
+                      "dir": "ASC",
+                      "hint": "time",
+                      "name": ""
+                    }
+                  ],
+                  "queryType": "timeseries",
+                  "table": "transaq_trades"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT time, count(price) as \"count\" FROM \"default\".\"transaq_trades\" WHERE sec_code in [$sec_code] AND ( time >= $__fromTime AND time <= $__toTime ) AND ( buy_sell = 'B' ) GROUP by time ORDER BY time ASC",
+              "refId": "Buy"
+            },
+            {
+              "builderOptions": {
+                "aggregates": [],
+                "columns": [
+                  {
+                    "alias": "sec_code",
+                    "custom": false,
+                    "name": "sec_code",
+                    "type": "LowCardinality(FixedString(16))"
+                  },
+                  {
+                    "alias": "buy_sell",
+                    "custom": false,
+                    "name": "buy_sell",
+                    "type": "LowCardinality(FixedString(1))"
+                  },
+                  {
+                    "alias": "pice",
+                    "custom": false,
+                    "name": "pice",
+                    "type": "Float32"
+                  },
+                  {
+                    "alias": "quantity",
+                    "custom": false,
+                    "name": "quantity",
+                    "type": "UInt32"
+                  },
+                  {
+                    "hint": "time",
+                    "name": "time",
+                    "type": "DateTime"
+                  }
+                ],
+                "database": "default",
+                "filters": [
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "hint": "time",
+                    "key": "",
+                    "operator": "WITH IN DASHBOARD TIME RANGE",
+                    "type": "datetime"
+                  },
+                  {
+                    "condition": "AND",
+                    "filterType": "custom",
+                    "key": "buy_sell",
+                    "label": "buy_sell",
+                    "operator": "=",
+                    "type": "LowCardinality(FixedString(1))",
+                    "value": "S"
+                  }
+                ],
+                "groupBy": [],
+                "limit": 1000,
+                "meta": {},
+                "mode": "aggregate",
+                "orderBy": [
+                  {
+                    "default": true,
+                    "dir": "ASC",
+                    "hint": "time",
+                    "name": ""
+                  }
+                ],
+                "queryType": "timeseries",
+                "table": "transaq_trades"
+              },
+              "datasource": {
+                "type": "grafana-clickhouse-datasource",
+                "uid": "bdx7lxrdelxq8b"
+              },
+              "editorType": "sql",
+              "format": 0,
+              "hide": false,
+              "meta": {
+                "builderOptions": {
+                  "aggregates": [],
+                  "columns": [
+                    {
+                      "alias": "sec_code",
+                      "custom": false,
+                      "name": "sec_code",
+                      "type": "LowCardinality(FixedString(16))"
+                    },
+                    {
+                      "alias": "buy_sell",
+                      "custom": false,
+                      "name": "buy_sell",
+                      "type": "LowCardinality(FixedString(1))"
+                    },
+                    {
+                      "alias": "pice",
+                      "custom": false,
+                      "name": "pice",
+                      "type": "Float32"
+                    },
+                    {
+                      "alias": "quantity",
+                      "custom": false,
+                      "name": "quantity",
+                      "type": "UInt32"
+                    },
+                    {
+                      "hint": "time",
+                      "name": "time",
+                      "type": "DateTime"
+                    }
+                  ],
+                  "database": "default",
+                  "filters": [
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "hint": "time",
+                      "key": "",
+                      "operator": "WITH IN DASHBOARD TIME RANGE",
+                      "type": "datetime"
+                    },
+                    {
+                      "condition": "AND",
+                      "filterType": "custom",
+                      "key": "buy_sell",
+                      "label": "buy_sell",
+                      "operator": "=",
+                      "type": "LowCardinality(FixedString(1))",
+                      "value": "S"
+                    }
+                  ],
+                  "groupBy": [],
+                  "limit": 1000,
+                  "meta": {},
+                  "mode": "aggregate",
+                  "orderBy": [
+                    {
+                      "default": true,
+                      "dir": "ASC",
+                      "hint": "time",
+                      "name": ""
+                    }
+                  ],
+                  "queryType": "timeseries",
+                  "table": "transaq_trades"
+                }
+              },
+              "pluginVersion": "4.3.2",
+              "queryType": "timeseries",
+              "rawSql": "SELECT time, count(price)* -1 as \"count\" FROM \"default\".\"transaq_trades\" WHERE sec_code in [$sec_code] AND ( time >= $__fromTime AND time <= $__toTime ) AND ( buy_sell = 'S' ) GROUP by time ORDER BY time ASC",
+              "refId": "Sell"
+            }
+          ],
+          "title": "Count trades $sec_code",
+          "type": "timeseries"
+        }
+      ],
+      "title": "Volume by sec",
+      "type": "row"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 7,
+      "panels": [],
+      "title": "Volume Indexes",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "grafana-clickhouse-datasource",
+        "uid": "bdx7lxrdelxq8b"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": true,
+            "axisColorMode": "series",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.5,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "currencyRUB"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Интерес на вчера разница объемов"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 11,
+      "interval": "${interval}m",
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "sum",
+            "stdDev"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [],
+            "columns": [
+              {
+                "alias": "sec_code",
+                "custom": false,
+                "name": "sec_code",
+                "type": "LowCardinality(FixedString(16))"
+              },
+              {
+                "alias": "buy_sell",
+                "custom": false,
+                "name": "buy_sell",
+                "type": "LowCardinality(FixedString(1))"
+              },
+              {
+                "alias": "pice",
+                "custom": false,
+                "name": "pice",
+                "type": "Float32"
+              },
+              {
+                "alias": "quantity",
+                "custom": false,
+                "name": "quantity",
+                "type": "UInt32"
+              },
+              {
+                "hint": "time",
+                "name": "time",
+                "type": "DateTime"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              },
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "buy_sell",
+                "label": "buy_sell",
+                "operator": "=",
+                "type": "LowCardinality(FixedString(1))",
+                "value": "S"
+              }
+            ],
+            "groupBy": [],
+            "limit": 1000,
+            "meta": {},
+            "mode": "aggregate",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "transaq_trades"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [],
+              "columns": [
+                {
+                  "alias": "sec_code",
+                  "custom": false,
+                  "name": "sec_code",
+                  "type": "LowCardinality(FixedString(16))"
+                },
+                {
+                  "alias": "buy_sell",
+                  "custom": false,
+                  "name": "buy_sell",
+                  "type": "LowCardinality(FixedString(1))"
+                },
+                {
+                  "alias": "pice",
+                  "custom": false,
+                  "name": "pice",
+                  "type": "Float32"
+                },
+                {
+                  "alias": "quantity",
+                  "custom": false,
+                  "name": "quantity",
+                  "type": "UInt32"
+                },
+                {
+                  "hint": "time",
+                  "name": "time",
+                  "type": "DateTime"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                },
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "buy_sell",
+                  "label": "buy_sell",
+                  "operator": "=",
+                  "type": "LowCardinality(FixedString(1))",
+                  "value": "S"
+                }
+              ],
+              "groupBy": [],
+              "limit": 1000,
+              "meta": {},
+              "mode": "aggregate",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "transaq_trades"
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "timeseries",
+          "rawSql": "SELECT minute , sum(vol) as \"разница объемов\" FROM (\n  SELECT toStartOfInterval(time, INTERVAL ${interval} MINUTE) as \"minute\", if(buy_sell == 'S', -1, 1) * sum(price * quantity * s.lotsize) as \"vol\"\n  FROM \"default\".\"transaq_trades\" JOIN default.transaq_securities s on (transaq_trades.sec_code = s.seccode and transaq_trades.board = s.board)\n  WHERE sec_code not in [$sec_code_etf] AND board = 'TQBR' AND ( minute >= $__fromTime AND minute <= $__toTime )\n  GROUP by \"minute\", buy_sell)\nGROUP by \"minute\"\nORDER BY minute",
+          "refId": "Интерес на сегодня"
+        },
+        {
+          "builderOptions": {
+            "aggregates": [],
+            "columns": [
+              {
+                "alias": "sec_code",
+                "custom": false,
+                "name": "sec_code",
+                "type": "LowCardinality(FixedString(16))"
+              },
+              {
+                "alias": "buy_sell",
+                "custom": false,
+                "name": "buy_sell",
+                "type": "LowCardinality(FixedString(1))"
+              },
+              {
+                "alias": "pice",
+                "custom": false,
+                "name": "pice",
+                "type": "Float32"
+              },
+              {
+                "alias": "quantity",
+                "custom": false,
+                "name": "quantity",
+                "type": "UInt32"
+              },
+              {
+                "hint": "time",
+                "name": "time",
+                "type": "DateTime"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              },
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "buy_sell",
+                "label": "buy_sell",
+                "operator": "=",
+                "type": "LowCardinality(FixedString(1))",
+                "value": "S"
+              }
+            ],
+            "groupBy": [],
+            "limit": 1000,
+            "meta": {},
+            "mode": "aggregate",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "transaq_trades"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [],
+              "columns": [
+                {
+                  "alias": "sec_code",
+                  "custom": false,
+                  "name": "sec_code",
+                  "type": "LowCardinality(FixedString(16))"
+                },
+                {
+                  "alias": "buy_sell",
+                  "custom": false,
+                  "name": "buy_sell",
+                  "type": "LowCardinality(FixedString(1))"
+                },
+                {
+                  "alias": "pice",
+                  "custom": false,
+                  "name": "pice",
+                  "type": "Float32"
+                },
+                {
+                  "alias": "quantity",
+                  "custom": false,
+                  "name": "quantity",
+                  "type": "UInt32"
+                },
+                {
+                  "hint": "time",
+                  "name": "time",
+                  "type": "DateTime"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                },
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "buy_sell",
+                  "label": "buy_sell",
+                  "operator": "=",
+                  "type": "LowCardinality(FixedString(1))",
+                  "value": "S"
+                }
+              ],
+              "groupBy": [],
+              "limit": 1000,
+              "meta": {},
+              "mode": "aggregate",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "transaq_trades"
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "timeseries",
+          "rawSql": "SELECT minute , sum(vol) as \"разница объемов\" FROM (\n  SELECT toStartOfInterval(timestamp_add(day, 1, time), INTERVAL ${interval} MINUTE) as \"minute\", if(buy_sell == 'S', -1, 1) * sum(price * quantity * s.lotsize) as \"vol\"\n  FROM \"default\".\"transaq_trades\" JOIN default.transaq_securities s on (transaq_trades.sec_code = s.seccode and transaq_trades.board = s.board)\n  WHERE sec_code not in [$sec_code_etf] AND board = 'TQBR' AND ( minute >= $__fromTime AND minute <= $__toTime )\n  GROUP by \"minute\", buy_sell)\nGROUP by \"minute\"\nORDER BY minute",
+          "refId": "Интерес на вчера"
+        }
+      ],
+      "title": "Volume trades IMOEX diff with buy ad sell by interval $interval в минутах",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "grafana-clickhouse-datasource",
+        "uid": "bdx7lxrdelxq8b"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": true,
+            "axisColorMode": "series",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.5,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "currencyRUB"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell vol"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buy vol"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Продажи объем"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 4,
+      "interval": "${interval}m",
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "sum"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [],
+            "columns": [
+              {
+                "alias": "sec_code",
+                "custom": false,
+                "name": "sec_code",
+                "type": "LowCardinality(FixedString(16))"
+              },
+              {
+                "alias": "pice",
+                "custom": false,
+                "name": "pice",
+                "type": "Float32"
+              },
+              {
+                "alias": "quantity",
+                "custom": false,
+                "name": "quantity",
+                "type": "UInt32"
+              },
+              {
+                "hint": "time",
+                "name": "time",
+                "type": "DateTime"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              },
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "buy_sell",
+                "label": "buy_sell",
+                "operator": "=",
+                "type": "LowCardinality(FixedString(1))",
+                "value": "B"
+              }
+            ],
+            "groupBy": [],
+            "limit": 1000,
+            "meta": {},
+            "mode": "aggregate",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "transaq_trades"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [],
+              "columns": [
+                {
+                  "alias": "sec_code",
+                  "custom": false,
+                  "name": "sec_code",
+                  "type": "LowCardinality(FixedString(16))"
+                },
+                {
+                  "alias": "pice",
+                  "custom": false,
+                  "name": "pice",
+                  "type": "Float32"
+                },
+                {
+                  "alias": "quantity",
+                  "custom": false,
+                  "name": "quantity",
+                  "type": "UInt32"
+                },
+                {
+                  "hint": "time",
+                  "name": "time",
+                  "type": "DateTime"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                },
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "buy_sell",
+                  "label": "buy_sell",
+                  "operator": "=",
+                  "type": "LowCardinality(FixedString(1))",
+                  "value": "B"
+                }
+              ],
+              "groupBy": [],
+              "limit": 1000,
+              "meta": {},
+              "mode": "aggregate",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "transaq_trades"
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "timeseries",
+          "rawSql": "SELECT toStartOfInterval(time, INTERVAL $interval MINUTE) as \"minute\", sum(price * quantity) as \"объем\" FROM \"default\".\"transaq_trades\" WHERE ( minute >= $__fromTime AND minute <= $__toTime ) AND ( buy_sell = 'B' ) AND sec_code not in [$sec_code_etf] AND board = 'TQBR' GROUP by \"minute\" ORDER BY minute ASC LIMIT 10000",
+          "refId": "Покупки"
+        },
+        {
+          "builderOptions": {
+            "aggregates": [],
+            "columns": [
+              {
+                "alias": "sec_code",
+                "custom": false,
+                "name": "sec_code",
+                "type": "LowCardinality(FixedString(16))"
+              },
+              {
+                "alias": "buy_sell",
+                "custom": false,
+                "name": "buy_sell",
+                "type": "LowCardinality(FixedString(1))"
+              },
+              {
+                "alias": "pice",
+                "custom": false,
+                "name": "pice",
+                "type": "Float32"
+              },
+              {
+                "alias": "quantity",
+                "custom": false,
+                "name": "quantity",
+                "type": "UInt32"
+              },
+              {
+                "hint": "time",
+                "name": "time",
+                "type": "DateTime"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              },
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "buy_sell",
+                "label": "buy_sell",
+                "operator": "=",
+                "type": "LowCardinality(FixedString(1))",
+                "value": "S"
+              }
+            ],
+            "groupBy": [],
+            "limit": 1000,
+            "meta": {},
+            "mode": "aggregate",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "transaq_trades"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [],
+              "columns": [
+                {
+                  "alias": "sec_code",
+                  "custom": false,
+                  "name": "sec_code",
+                  "type": "LowCardinality(FixedString(16))"
+                },
+                {
+                  "alias": "buy_sell",
+                  "custom": false,
+                  "name": "buy_sell",
+                  "type": "LowCardinality(FixedString(1))"
+                },
+                {
+                  "alias": "pice",
+                  "custom": false,
+                  "name": "pice",
+                  "type": "Float32"
+                },
+                {
+                  "alias": "quantity",
+                  "custom": false,
+                  "name": "quantity",
+                  "type": "UInt32"
+                },
+                {
+                  "hint": "time",
+                  "name": "time",
+                  "type": "DateTime"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                },
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "buy_sell",
+                  "label": "buy_sell",
+                  "operator": "=",
+                  "type": "LowCardinality(FixedString(1))",
+                  "value": "S"
+                }
+              ],
+              "groupBy": [],
+              "limit": 1000,
+              "meta": {},
+              "mode": "aggregate",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "transaq_trades"
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "timeseries",
+          "rawSql": "SELECT toStartOfInterval(time, INTERVAL $interval MINUTE) as \"minute\", sum(price * quantity)*-1 as \"объем\" FROM \"default\".\"transaq_trades\" WHERE ( minute >= $__fromTime AND minute <= $__toTime ) AND ( buy_sell = 'S' ) AND sec_code not in [$sec_code_etf] AND board = 'TQBR' GROUP by minute ORDER BY minute ASC LIMIT 10000",
+          "refId": "Продажи"
+        }
+      ],
+      "title": "Volume trades IMOEX by interval $interval в минутах",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "grafana-clickhouse-datasource",
+        "uid": "bdx7lxrdelxq8b"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": true,
+            "axisColorMode": "series",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.5,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "currencyRUB"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell vol"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buy vol"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Продажи объем"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 6,
+      "interval": "${interval}m",
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "sum"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [],
+            "columns": [
+              {
+                "alias": "sec_code",
+                "custom": false,
+                "name": "sec_code",
+                "type": "LowCardinality(FixedString(16))"
+              },
+              {
+                "alias": "pice",
+                "custom": false,
+                "name": "pice",
+                "type": "Float32"
+              },
+              {
+                "alias": "quantity",
+                "custom": false,
+                "name": "quantity",
+                "type": "UInt32"
+              },
+              {
+                "hint": "time",
+                "name": "time",
+                "type": "DateTime"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              },
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "buy_sell",
+                "label": "buy_sell",
+                "operator": "=",
+                "type": "LowCardinality(FixedString(1))",
+                "value": "B"
+              }
+            ],
+            "groupBy": [],
+            "limit": 1000,
+            "meta": {},
+            "mode": "aggregate",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "transaq_trades"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [],
+              "columns": [
+                {
+                  "alias": "sec_code",
+                  "custom": false,
+                  "name": "sec_code",
+                  "type": "LowCardinality(FixedString(16))"
+                },
+                {
+                  "alias": "pice",
+                  "custom": false,
+                  "name": "pice",
+                  "type": "Float32"
+                },
+                {
+                  "alias": "quantity",
+                  "custom": false,
+                  "name": "quantity",
+                  "type": "UInt32"
+                },
+                {
+                  "hint": "time",
+                  "name": "time",
+                  "type": "DateTime"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                },
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "buy_sell",
+                  "label": "buy_sell",
+                  "operator": "=",
+                  "type": "LowCardinality(FixedString(1))",
+                  "value": "B"
+                }
+              ],
+              "groupBy": [],
+              "limit": 1000,
+              "meta": {},
+              "mode": "aggregate",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "transaq_trades"
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "timeseries",
+          "rawSql": "SELECT toStartOfInterval(time, INTERVAL $interval MINUTE) as \"minute\", sum(price * quantity) as \"объем\" FROM \"default\".\"transaq_trades\" WHERE ( minute >= $__fromTime AND minute <= $__toTime ) AND ( buy_sell = 'B' ) AND sec_code in [$sec_code_etf] GROUP by \"minute\" ORDER BY minute ASC LIMIT 10000",
+          "refId": "Покупки"
+        },
+        {
+          "builderOptions": {
+            "aggregates": [],
+            "columns": [
+              {
+                "alias": "sec_code",
+                "custom": false,
+                "name": "sec_code",
+                "type": "LowCardinality(FixedString(16))"
+              },
+              {
+                "alias": "buy_sell",
+                "custom": false,
+                "name": "buy_sell",
+                "type": "LowCardinality(FixedString(1))"
+              },
+              {
+                "alias": "pice",
+                "custom": false,
+                "name": "pice",
+                "type": "Float32"
+              },
+              {
+                "alias": "quantity",
+                "custom": false,
+                "name": "quantity",
+                "type": "UInt32"
+              },
+              {
+                "hint": "time",
+                "name": "time",
+                "type": "DateTime"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              },
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "buy_sell",
+                "label": "buy_sell",
+                "operator": "=",
+                "type": "LowCardinality(FixedString(1))",
+                "value": "S"
+              }
+            ],
+            "groupBy": [],
+            "limit": 1000,
+            "meta": {},
+            "mode": "aggregate",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "transaq_trades"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [],
+              "columns": [
+                {
+                  "alias": "sec_code",
+                  "custom": false,
+                  "name": "sec_code",
+                  "type": "LowCardinality(FixedString(16))"
+                },
+                {
+                  "alias": "buy_sell",
+                  "custom": false,
+                  "name": "buy_sell",
+                  "type": "LowCardinality(FixedString(1))"
+                },
+                {
+                  "alias": "pice",
+                  "custom": false,
+                  "name": "pice",
+                  "type": "Float32"
+                },
+                {
+                  "alias": "quantity",
+                  "custom": false,
+                  "name": "quantity",
+                  "type": "UInt32"
+                },
+                {
+                  "hint": "time",
+                  "name": "time",
+                  "type": "DateTime"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                },
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "buy_sell",
+                  "label": "buy_sell",
+                  "operator": "=",
+                  "type": "LowCardinality(FixedString(1))",
+                  "value": "S"
+                }
+              ],
+              "groupBy": [],
+              "limit": 1000,
+              "meta": {},
+              "mode": "aggregate",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "transaq_trades"
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "timeseries",
+          "rawSql": "SELECT toStartOfInterval(time, INTERVAL $interval MINUTE) as \"minute\", sum(price * quantity)*-1 as \"объем\" FROM \"default\".\"transaq_trades\" WHERE  sec_code in [$sec_code_etf] AND ( minute >= $__fromTime AND minute <= $__toTime ) AND ( buy_sell = 'S' ) GROUP by minute ORDER BY minute ASC LIMIT 10000",
+          "refId": "Продажи"
+        }
+      ],
+      "title": "Volume trades ETF by interval $interval в минутах",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "grafana-clickhouse-datasource",
+        "uid": "bdx7lxrdelxq8b"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.1,
+            "drawStyle": "bars",
+            "fillOpacity": 79,
+            "gradientMode": "hue",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 6,
+            "pointSize": 14,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyRUB"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sell vol"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Продажи vol"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum",
+            "mean"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "builderOptions": {
+            "aggregates": [],
+            "columns": [
+              {
+                "alias": "sec_code",
+                "custom": false,
+                "name": "sec_code",
+                "type": "LowCardinality(FixedString(16))"
+              },
+              {
+                "alias": "pice",
+                "custom": false,
+                "name": "pice",
+                "type": "Float32"
+              },
+              {
+                "alias": "quantity",
+                "custom": false,
+                "name": "quantity",
+                "type": "UInt32"
+              },
+              {
+                "hint": "time",
+                "name": "time",
+                "type": "DateTime"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              },
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "buy_sell",
+                "label": "buy_sell",
+                "operator": "=",
+                "type": "LowCardinality(FixedString(1))",
+                "value": "B"
+              }
+            ],
+            "groupBy": [],
+            "limit": 1000,
+            "meta": {},
+            "mode": "aggregate",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "transaq_trades"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [],
+              "columns": [
+                {
+                  "alias": "sec_code",
+                  "custom": false,
+                  "name": "sec_code",
+                  "type": "LowCardinality(FixedString(16))"
+                },
+                {
+                  "alias": "pice",
+                  "custom": false,
+                  "name": "pice",
+                  "type": "Float32"
+                },
+                {
+                  "alias": "quantity",
+                  "custom": false,
+                  "name": "quantity",
+                  "type": "UInt32"
+                },
+                {
+                  "hint": "time",
+                  "name": "time",
+                  "type": "DateTime"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                },
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "buy_sell",
+                  "label": "buy_sell",
+                  "operator": "=",
+                  "type": "LowCardinality(FixedString(1))",
+                  "value": "B"
+                }
+              ],
+              "groupBy": [],
+              "limit": 1000,
+              "meta": {},
+              "mode": "aggregate",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "transaq_trades"
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "timeseries",
+          "rawSql": "SELECT time, sum(price * quantity) as \"vol\" FROM \"default\".\"transaq_trades\" WHERE ( time >= $__fromTime AND time <= $__toTime ) AND ( buy_sell = 'B' ) AND sec_code not in [$sec_code_etf] GROUP BY time ORDER BY time ASC",
+          "refId": "Покупки"
+        },
+        {
+          "builderOptions": {
+            "aggregates": [],
+            "columns": [
+              {
+                "alias": "sec_code",
+                "custom": false,
+                "name": "sec_code",
+                "type": "LowCardinality(FixedString(16))"
+              },
+              {
+                "alias": "buy_sell",
+                "custom": false,
+                "name": "buy_sell",
+                "type": "LowCardinality(FixedString(1))"
+              },
+              {
+                "alias": "pice",
+                "custom": false,
+                "name": "pice",
+                "type": "Float32"
+              },
+              {
+                "alias": "quantity",
+                "custom": false,
+                "name": "quantity",
+                "type": "UInt32"
+              },
+              {
+                "hint": "time",
+                "name": "time",
+                "type": "DateTime"
+              }
+            ],
+            "database": "default",
+            "filters": [
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "hint": "time",
+                "key": "",
+                "operator": "WITH IN DASHBOARD TIME RANGE",
+                "type": "datetime"
+              },
+              {
+                "condition": "AND",
+                "filterType": "custom",
+                "key": "buy_sell",
+                "label": "buy_sell",
+                "operator": "=",
+                "type": "LowCardinality(FixedString(1))",
+                "value": "S"
+              }
+            ],
+            "groupBy": [],
+            "limit": 1000,
+            "meta": {},
+            "mode": "aggregate",
+            "orderBy": [
+              {
+                "default": true,
+                "dir": "ASC",
+                "hint": "time",
+                "name": ""
+              }
+            ],
+            "queryType": "timeseries",
+            "table": "transaq_trades"
+          },
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "bdx7lxrdelxq8b"
+          },
+          "editorType": "sql",
+          "format": 0,
+          "hide": false,
+          "meta": {
+            "builderOptions": {
+              "aggregates": [],
+              "columns": [
+                {
+                  "alias": "sec_code",
+                  "custom": false,
+                  "name": "sec_code",
+                  "type": "LowCardinality(FixedString(16))"
+                },
+                {
+                  "alias": "buy_sell",
+                  "custom": false,
+                  "name": "buy_sell",
+                  "type": "LowCardinality(FixedString(1))"
+                },
+                {
+                  "alias": "pice",
+                  "custom": false,
+                  "name": "pice",
+                  "type": "Float32"
+                },
+                {
+                  "alias": "quantity",
+                  "custom": false,
+                  "name": "quantity",
+                  "type": "UInt32"
+                },
+                {
+                  "hint": "time",
+                  "name": "time",
+                  "type": "DateTime"
+                }
+              ],
+              "database": "default",
+              "filters": [
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "hint": "time",
+                  "key": "",
+                  "operator": "WITH IN DASHBOARD TIME RANGE",
+                  "type": "datetime"
+                },
+                {
+                  "condition": "AND",
+                  "filterType": "custom",
+                  "key": "buy_sell",
+                  "label": "buy_sell",
+                  "operator": "=",
+                  "type": "LowCardinality(FixedString(1))",
+                  "value": "S"
+                }
+              ],
+              "groupBy": [],
+              "limit": 1000,
+              "meta": {},
+              "mode": "aggregate",
+              "orderBy": [
+                {
+                  "default": true,
+                  "dir": "ASC",
+                  "hint": "time",
+                  "name": ""
+                }
+              ],
+              "queryType": "timeseries",
+              "table": "transaq_trades"
+            }
+          },
+          "pluginVersion": "4.3.2",
+          "queryType": "timeseries",
+          "rawSql": "SELECT time, sum(price * quantity)*-1 as \"vol\" FROM \"default\".\"transaq_trades\" WHERE ( time >= $__fromTime AND time <= $__toTime ) AND ( buy_sell = 'S' ) AND sec_code not in [$sec_code_etf] GROUP BY time  ORDER BY time ASC",
+          "refId": "Продажи"
+        }
+      ],
+      "title": "Volume trades IMOEX",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "isNone": true,
+          "selected": false,
+          "text": "None",
+          "value": ""
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "bdx7lxrdelxq8b"
+        },
+        "definition": "SELECT sec_code FROM \"default\".\"transaq_trades\" WHERE ( time >= $__fromTime AND time <= $__toTime ) GROUP by sec_code ORDER BY sec_code ASC LIMIT 1000",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Инструмент",
+        "multi": true,
+        "name": "sec_code",
+        "options": [],
+        "query": "SELECT sec_code FROM \"default\".\"transaq_trades\" WHERE ( time >= $__fromTime AND time <= $__toTime ) GROUP by sec_code ORDER BY sec_code ASC LIMIT 1000",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "1",
+          "value": "1"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Интервал агрегации в минутах",
+        "multi": false,
+        "name": "interval",
+        "options": [
+          {
+            "selected": true,
+            "text": "1",
+            "value": "1"
+          },
+          {
+            "selected": false,
+            "text": "3",
+            "value": "3"
+          },
+          {
+            "selected": false,
+            "text": "5",
+            "value": "5"
+          },
+          {
+            "selected": false,
+            "text": "10",
+            "value": "10"
+          },
+          {
+            "selected": false,
+            "text": "12",
+            "value": "12"
+          },
+          {
+            "selected": false,
+            "text": "15",
+            "value": "15"
+          },
+          {
+            "selected": false,
+            "text": "20",
+            "value": "20"
+          },
+          {
+            "selected": false,
+            "text": "24",
+            "value": "24"
+          },
+          {
+            "selected": false,
+            "text": "30",
+            "value": "30"
+          },
+          {
+            "selected": false,
+            "text": "48",
+            "value": "48"
+          },
+          {
+            "selected": false,
+            "text": "60",
+            "value": "60"
+          },
+          {
+            "selected": false,
+            "text": "120",
+            "value": "120"
+          },
+          {
+            "selected": false,
+            "text": "240",
+            "value": "240"
+          },
+          {
+            "selected": false,
+            "text": "480",
+            "value": "480"
+          }
+        ],
+        "query": "1,3,5,10,12,15,20,24,30,48,60,120,240,480",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "allValue": "",
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "bdx7lxrdelxq8b"
+        },
+        "definition": "select sec_code from transaq_trades\njoin default.transaq_securities t on transaq_trades.secid = t.secid\nwhere board = 'TQTF' AND  time >= $__fromTime AND time <= $__toTime GROUP BY sec_code",
+        "hide": 0,
+        "includeAll": true,
+        "label": "ETF",
+        "multi": true,
+        "name": "sec_code_etf",
+        "options": [],
+        "query": "select sec_code from transaq_trades\njoin default.transaq_securities t on transaq_trades.secid = t.secid\nwhere board = 'TQTF' AND  time >= $__fromTime AND time <= $__toTime GROUP BY sec_code",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "2024-12-06T06:57:21.009Z",
+    "to": "2024-12-06T16:00:11.355Z"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Trades",
+  "uid": "ee5qeifx0qubke",
+  "version": 45,
+  "weekStart": ""
+}
