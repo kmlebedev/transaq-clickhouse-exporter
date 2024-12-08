@@ -108,7 +108,7 @@ const (
     `
 )
 
-func insertQuote(quote *commands.Quote, eventTime *time.Time) errt {
+func insertQuote(quote *commands.Quote, eventTime *time.Time) error {
 	return connect.AsyncInsert(ctx, ChQuotesInsert, asyncInsertWait,
 		fmt.Sprint(eventTime.Format(tableTimeLayout)),
 		quote.SecId,
