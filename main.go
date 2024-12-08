@@ -67,9 +67,9 @@ func init() {
 
 func main() {
 	defer func() {
-		tc.Disconnect()
+		_ = tc.Disconnect()
 		tc.Close()
-		connect.Close()
+		_ = connect.Close()
 	}()
 
 	exportAllTradesSec := []string{}
