@@ -4,7 +4,7 @@ go 1.23.3
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.30.0
-	github.com/kmlebedev/txmlconnector v1.26.5
+	github.com/kmlebedev/txmlconnector v1.26.6
 	github.com/sirupsen/logrus v1.9.3
 )
 

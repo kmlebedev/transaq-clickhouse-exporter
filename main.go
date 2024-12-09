@@ -63,6 +63,9 @@ func init() {
 			log.Fatal(err)
 		}
 	}
+	if tc, err = tcClient.NewTCClient(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func main() {

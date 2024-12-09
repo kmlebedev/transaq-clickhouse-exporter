@@ -104,7 +104,7 @@ const (
         buy      Int16,
         Sell     Int16,
     ) ENGINE = ReplacingMergeTree()
-	ORDER BY (sec_code, market, regnumber, isin)
+	ORDER BY (sec_code, board, price, source)
     `
 )
 
