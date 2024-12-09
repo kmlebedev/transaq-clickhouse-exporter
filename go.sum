@@ -27,12 +27,10 @@ github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+o
 github.com/klauspost/compress v1.13.6/go.mod h1:/3/Vjq9QcHkK5uEr5lBEmyoZ1iFhe47etQ6QUkpK6sk=
 github.com/klauspost/compress v1.17.7 h1:ehO88t2UGzQK66LMdE8tibEd1ErmzZjNEqWkjLAKQQg=
 github.com/klauspost/compress v1.17.7/go.mod h1:Di0epgTjJY877eYKx5yC51cX2A2Vl2ibi7bDH9ttBbw=
-github.com/kmlebedev/txmlconnector v1.26.1 h1:OUba3M6xFB0ynsRHmN8UYyUEJ+nM0JqKMB2LXs6VLrw=
-github.com/kmlebedev/txmlconnector v1.26.1/go.mod h1:N4TCzeCR82lBINAnd4nbkj4aPjmlb7pqZMqqpF1zyq8=
-github.com/kmlebedev/txmlconnector v1.26.2 h1:EwcKii3My5XiKkP8dO5GS4xaMDSfC6IodD4Cqb8h8Ac=
-github.com/kmlebedev/txmlconnector v1.26.2/go.mod h1:UbNNGT7lwwgFaZ79fS1Yq7CBrV32JG99RJWJ7CZbuhY=
-github.com/kmlebedev/txmlconnector v1.26.3-0.20241207125021-c20fafcc442c h1:D2e0T+HgcogL5XUfge7n1ojr2a4nakutlxzghMb0G0I=
-github.com/kmlebedev/txmlconnector v1.26.3-0.20241207125021-c20fafcc442c/go.mod h1:sCC7j24heKxhOCeM8SecFRV3ajzVXjfBIhmNat4jcRg=
+github.com/kmlebedev/txmlconnector v1.26.5 h1:OmGARtVzEF1nfbe0d4Ind0I2vP7jQSCsucOxe3cLFBs=
+github.com/kmlebedev/txmlconnector v1.26.5/go.mod h1:i3zKzNkJsLmViz5qEl37Iv/mevDDaperVY4whrV6rsM=
+github.com/kmlebedev/txmlconnector v1.26.6 h1:bmzeLQq25ofbCkd3js5fhV/yDdZ3q7iKM0jOb8E9/MU=
+github.com/kmlebedev/txmlconnector v1.26.6/go.mod h1:i3zKzNkJsLmViz5qEl37Iv/mevDDaperVY4whrV6rsM=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
 github.com/kr/pretty v0.3.1/go.mod h1:hoEshYVHaxMs3cyo3Yncou5ZscifuDolrwPKZanG3xk=
@@ -119,8 +117,8 @@ golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8T
 golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20241206012308-a4fef0638583 h1:IfdSdTcLFy4lqUQrQJLkLt1PB+AsqVz6lwkWPzWEz10=
 google.golang.org/genproto/googleapis/rpc v0.0.0-20241206012308-a4fef0638583/go.mod h1:5uTbfoYQed2U9p3KIj2/Zzm02PYhndfdmML0qC3q3FU=
-google.golang.org/grpc v1.68.0 h1:aHQeeJbo8zAkAa3pRzrVjZlbz6uSfeOXlJNQM0RAbz0=
-google.golang.org/grpc v1.68.0/go.mod h1:fmSPC5AsjSBCK54MyHRx48kpOti1/jRfOlwEWywNjWA=
+google.golang.org/grpc v1.68.1 h1:oI5oTa11+ng8r8XMMN7jAOmWfPZWbYpCFaMUTACxkM0=
+google.golang.org/grpc v1.68.1/go.mod h1:+q1XYFJjShcqn0QZHvCyeR4CXPA+llXIeUIfIe00waw=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
 google.golang.org/protobuf v1.35.2 h1:8Ar7bF+apOIoThw1EdZl0p1oWvMqTHmpA2fRTyZO8io=
