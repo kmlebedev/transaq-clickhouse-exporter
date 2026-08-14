@@ -2,36 +2,25 @@ package main
 
 import (
 	"context"
-	"encoding/xml"
 	"fmt"
+	"os"
+	"os/signal"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/kmlebedev/txmlconnector/client"
 	"github.com/kmlebedev/txmlconnector/client/commands"
 	log "github.com/sirupsen/logrus"
-	"os"
-	"slices"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
-
-type SubSecurity struct {
-	XMLName xml.Name `xml:"security"`
-	Board   string   `xml:"board,omitempty"`
-	SecCode string   `xml:"seccode,omitempty"`
-}
-
-type SubSecAllTrades struct {
-	XMLName xml.Name      `xml:"alltrades,omitempty"`
-	Items   []SubSecurity `xml:"security,omitempty"`
-}
 
 var (
 	ctx                  = context.Background()
-	lvl                  log.Level
-	tc                   *tcClient.TCClient
 	connect              driver.Conn
 	quotations           = []commands.SubSecurity{}
 	positions            = commands.Positions{}
@@ -45,42 +34,64 @@ var (
 )
 
 func init() {
-	var err error
-
-	if lvl, err = log.ParseLevel(os.Getenv(EnvKeyLogLevel)); err == nil {
+	if lvl, err := log.ParseLevel(os.Getenv(EnvKeyLogLevel)); err == nil {
 		log.SetLevel(lvl)
 	}
+}
+
+func openClickHouse(openCtx context.Context) (driver.Conn, error) {
 	clickhouseUrl := "tcp://127.0.0.1:9000"
 	if chUrl := os.Getenv("CLICKHOUSE_URL"); chUrl != "" {
 		clickhouseUrl = chUrl
 	}
-	clickhouseOptions, _ := clickhouse.ParseDSN(clickhouseUrl)
-	for i := 0; i < 10; i++ {
-		log.Infof("Try connect to clickhouse %s", clickhouseUrl)
-		if connect, err = clickhouse.Open(clickhouseOptions); err != nil {
-			log.Fatal(err)
-		}
-		if err := connect.Ping(ctx); err != nil {
-			if exception, ok := err.(*clickhouse.Exception); ok {
+	clickhouseOptions, err := clickhouse.ParseDSN(clickhouseUrl)
+	if err != nil {
+		return nil, fmt.Errorf("parse ClickHouse DSN: %w", err)
+	}
+	conn, err := clickhouse.Open(clickhouseOptions)
+	if err != nil {
+		return nil, fmt.Errorf("open ClickHouse: %w", err)
+	}
+
+	var pingErr error
+	for attempt := 1; attempt <= 10; attempt++ {
+		log.Infof("Connect to ClickHouse %s (attempt %d/10)", clickhouseUrl, attempt)
+		if pingErr = conn.Ping(openCtx); pingErr != nil {
+			if exception, ok := pingErr.(*clickhouse.Exception); ok {
 				log.Infof("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
 			}
-			log.Warn(err)
+			log.Warn(pingErr)
 		} else {
 			break
 		}
-		time.Sleep(3 * time.Second)
-	}
-	for _, ddl := range []string{candlesDDL, securitiesDDL, securitiesInfoDDL, tradesDDL, quotesDDL} {
-		if err = connect.Exec(ctx, ddl); err != nil {
-			log.Fatal(err)
+		if attempt < 10 {
+			if err := waitForContext(openCtx, 3*time.Second); err != nil {
+				_ = conn.Close()
+				return nil, err
+			}
 		}
 	}
-	if tc, err = tcClient.NewTCClient(); err != nil {
-		log.Fatal(err)
+	if pingErr != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("connect to ClickHouse after 10 attempts: %w", pingErr)
 	}
+
+	for _, ddl := range []string{candlesDDL, securitiesDDL, securitiesInfoDDL, tradesDDL, quotesDDL} {
+		if err := conn.Exec(openCtx, ddl); err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("initialize ClickHouse schema: %w", err)
+		}
+	}
+	return conn, nil
 }
 
-func updateSecurities() {
+func updateSecurities(client *tcClient.TCClient) error {
+	isAllTradesPositions = false
+	quotations = quotations[:0]
+	allTrades.Items = allTrades.Items[:0]
+	getSecuritiesInfo = getSecuritiesInfo[:0]
+	exportSecInfoNames = exportSecInfoNames[:0]
+
 	exportAllTradesSec := []string{}
 	if envAllTrades := os.Getenv("EXPORT_ALL_TRADES"); envAllTrades != "" {
 		for _, sec := range strings.Split(envAllTrades, ",") {
@@ -113,11 +124,11 @@ func updateSecurities() {
 	}
 	batchSec, err := connect.PrepareBatch(ctx, ChSecuritiesInsertQuery)
 	if err != nil {
-		log.Error(err)
+		return fmt.Errorf("prepare securities batch: %w", err)
 	}
 	// TODO update allTRades if get message
 	// Feb 21 12:01:57 rock-5b transaq_clickhouse_exporter[3732508]: time="2025-02-21T12:01:57+05:00" level=info msg="secInfoUpd {XMLName:{Space: Local:sec_info_upd} SecId:30338 Market:4 SecCode:CR9BC5 MinPrice:0 MaxPrice:0 BuyDeposit:0 Sell
-	for _, sec := range tc.Data.Securities.Items {
+	for _, sec := range client.Data.Securities.Items {
 		exportSecBoardFound := false
 		if slices.Contains(exportSecBoards, sec.Board) {
 			exportSecBoardFound = true
@@ -146,8 +157,8 @@ func updateSecurities() {
 			sec.ShortName,
 			uint8(sec.Decimals),
 			float32(sec.MinStep),
-			uint8(sec.LotSize),
-			uint8(sec.LotDivider),
+			uint32(sec.LotSize),
+			uint16(sec.LotDivider),
 			float32(sec.PointCost),
 			sec.SecType,
 			uint8(sec.QuotesType)); err != nil {
@@ -170,7 +181,7 @@ func updateSecurities() {
 			continue
 		}
 		quotations = append(quotations, commands.SubSecurity{SecId: sec.SecId})
-		for _, kind := range tc.Data.CandleKinds.Items {
+		for _, kind := range client.Data.CandleKinds.Items {
 			if len(exportPeriodSeconds) > 0 {
 				exportPeriodSecondFound := false
 				for _, exportPeriodSecond := range exportPeriodSeconds {
@@ -185,8 +196,8 @@ func updateSecurities() {
 			if exportCandleCount == 0 {
 				continue
 			} else if exportCandleCount > 0 {
-				log.Debugf(fmt.Sprintf("gethistorydata sec %s period %d name %s seconds %d", sec.SecCode, kind.ID, kind.Name, kind.Period))
-				if err = tc.SendCommand(commands.Command{
+				log.Debugf("gethistorydata sec %s period %d name %s seconds %d", sec.SecCode, kind.ID, kind.Name, kind.Period)
+				if err = client.SendCommand(commands.Command{
 					Id:     "gethistorydata",
 					Period: kind.ID,
 					SecId:  sec.SecId,
@@ -199,7 +210,7 @@ func updateSecurities() {
 			} else {
 				for ExportCandleCount == dataCandleCount {
 					log.Debugf("loop get history %d == %d", ExportCandleCount, dataCandleCount)
-					if err = tc.SendCommand(commands.Command{
+					if err = client.SendCommand(commands.Command{
 						Id:     "gethistorydata",
 						Period: kind.ID,
 						SecId:  sec.SecId,
@@ -219,28 +230,25 @@ func updateSecurities() {
 	}
 	if batchSec.Rows() > 0 {
 		if err := batchSec.Send(); err != nil {
-			log.Error(err)
+			return fmt.Errorf("send securities batch: %w", err)
 		}
 	}
+	return nil
 }
 
 func main() {
-	defer func() {
-		_ = tc.Disconnect()
-		tc.Close()
-		_ = connect.Close()
-	}()
+	runCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ctx = runCtx
 
-	go processTransaq()
-
-	log.Infof("Wait txmlconnector ")
-	for {
-		if tc.Data.ServerStatus.Connected == "true" {
-			log.Infof(" connected\n")
-			break
-		}
-		fmt.Printf(".")
-		time.Sleep(5 * time.Second)
+	var err error
+	connect, err = openClickHouse(runCtx)
+	if err != nil {
+		log.Fatal(err)
 	}
-	<-tc.ShutdownChannel
+	defer func() { _ = connect.Close() }()
+
+	if err := superviseTransaq(runCtx, tcClient.NewTCClient, defaultReconnectConfig()); err != nil {
+		log.Fatal(err)
+	}
 }
