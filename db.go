@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"github.com/kmlebedev/txmlconnector/client/commands"
 	"time"
+
+	"github.com/kmlebedev/txmlconnector/client/commands"
 )
 
 const (
@@ -15,9 +17,9 @@ const (
 	tableTimeLayout         = "2006-01-02 15:04:05"
 	ChCandlesInsertQuery    = "INSERT INTO transaq_candles"
 	ChSecuritiesInsertQuery = "INSERT INTO transaq_securities"
-	ChTradesInsertQuery     = "INSERT INTO transaq_trades VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	ChTradesInsertQuery     = "INSERT INTO transaq_trades"
 	ChSecInfoInsertQuery    = "INSERT INTO transaq_securities_info VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-	ChQuotesInsert          = "INSERT INTO transaq_quotes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	ChQuotesInsert          = "INSERT INTO transaq_quotes"
 
 	candlesDDL = `CREATE TABLE IF NOT EXISTS transaq_candles (
 		date   DateTime('Europe/Moscow'),
@@ -109,39 +111,73 @@ const (
     `
 )
 
-func insertQuote(quote *commands.Quote, eventTime *time.Time) error {
-	return connect.AsyncInsert(ctx, ChQuotesInsert, asyncInsertWait,
-		fmt.Sprint(eventTime.Format(tableTimeLayout)),
-		quote.SecId,
-		quote.Board,
-		quote.SecCode,
-		quote.Price,
-		quote.Source,
-		quote.Yield,
-		quote.Buy,
-		quote.Sell,
-	)
-}
-func insertTrade(trade *commands.Trade) error {
-	tradeTime, _ := time.Parse(tradeTimeLayout, trade.Time)
-	return connect.AsyncInsert(ctx, ChTradesInsertQuery, asyncInsertWait,
-		fmt.Sprint(tradeTime.Format(tableTimeLayout)),
-		trade.SecId,
-		trade.SecCode,
-		trade.TradeNo,
-		trade.Board,
-		trade.Price,
-		trade.Quantity,
-		trade.BuySell,
-		trade.OpenInterest,
-		trade.Period)
+func insertQuotes(insertCtx context.Context, quotes commands.Quotes) error {
+	if len(quotes.Items) == 0 {
+		return nil
+	}
+	batch, err := connect.PrepareBatch(insertCtx, ChQuotesInsert)
+	if err != nil {
+		return fmt.Errorf("prepare quotes batch: %w", err)
+	}
+	defer batch.Close()
+	for _, quote := range quotes.Items {
+		if err := batch.Append(
+			fmt.Sprint(quotes.Time.Format(tableTimeLayout)),
+			quote.SecId,
+			quote.Board,
+			quote.SecCode,
+			quote.Price,
+			quote.Source,
+			quote.Yield,
+			quote.Buy,
+			quote.Sell,
+		); err != nil {
+			return fmt.Errorf("append quote %d: %w", quote.SecId, err)
+		}
+	}
+	if err := batch.Send(); err != nil {
+		return fmt.Errorf("send quotes batch: %w", err)
+	}
+	return nil
 }
 
-func insertSecInfo(secInfo *commands.SecInfo) error {
+func insertTrades(insertCtx context.Context, trades commands.AllTrades) error {
+	if len(trades.Items) == 0 {
+		return nil
+	}
+	batch, err := connect.PrepareBatch(insertCtx, ChTradesInsertQuery)
+	if err != nil {
+		return fmt.Errorf("prepare trades batch: %w", err)
+	}
+	defer batch.Close()
+	for _, trade := range trades.Items {
+		tradeTime, _ := time.Parse(tradeTimeLayout, trade.Time)
+		if err := batch.Append(
+			fmt.Sprint(tradeTime.Format(tableTimeLayout)),
+			trade.SecId,
+			trade.SecCode,
+			trade.TradeNo,
+			trade.Board,
+			trade.Price,
+			trade.Quantity,
+			trade.BuySell,
+			trade.OpenInterest,
+			trade.Period,
+		); err != nil {
+			return fmt.Errorf("append trade %d: %w", trade.TradeNo, err)
+		}
+	}
+	if err := batch.Send(); err != nil {
+		return fmt.Errorf("send trades batch: %w", err)
+	}
+	return nil
+}
+
+func insertSecInfo(insertCtx context.Context, secInfo commands.SecInfo) error {
 	matDate, _ := time.Parse(dateLayout, secInfo.MatDate)
 	couponDate, _ := time.Parse(dateLayout, secInfo.CouponDate)
 	buybackDate, _ := time.Parse(dateLayout, secInfo.BuybackDate)
-	return connect.AsyncInsert(ctx, ChSecInfoInsertQuery, asyncInsertWait,
+	return connect.AsyncInsert(insertCtx, ChSecInfoInsertQuery, asyncInsertWait,
 		secInfo.SecId,
 		secInfo.SecName,
 		secInfo.SecCode,

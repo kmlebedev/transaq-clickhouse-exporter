@@ -50,6 +50,8 @@ func (fake *fakeConnectServiceClient) SendCommand(
 func newTestTCClient(rpc pb.ConnectServiceClient) *tcClient.TCClient {
 	return &tcClient.TCClient{
 		Client:           rpc,
+		AllTradesChan:    make(chan commands.AllTrades, 16),
+		SecInfoUpdChan:   make(chan commands.SecInfoUpd, 16),
 		ServerStatusChan: make(chan commands.ServerStatus, 8),
 		ShutdownChannel:  make(chan bool, 1),
 	}
@@ -158,6 +160,114 @@ func TestProcessTransaqRetriesSubscriptionRestoreWithoutReconnect(t *testing.T) 
 	default:
 	}
 
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("processTransaq error = %v", err)
+	}
+}
+
+func TestProcessTransaqDrainsEventsWhileRestoringSubscriptions(t *testing.T) {
+	client := newTestTCClient(newFakeConnectServiceClient())
+	restoreStarted := make(chan struct{})
+	releaseRestore := make(chan struct{})
+	processCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- processTransaq(processCtx, client, reconnectConfig{
+			terminalRetryInterval: time.Hour,
+			restore: func(*tcClient.TCClient) error {
+				close(restoreStarted)
+				<-releaseRestore
+				return nil
+			},
+		})
+	}()
+
+	client.ServerStatusChan <- commands.ServerStatus{Connected: "true"}
+	select {
+	case <-restoreStarted:
+	case <-time.After(time.Second):
+		t.Fatal("subscription restore did not start")
+	}
+
+	sent := make(chan struct{})
+	go func() {
+		defer close(sent)
+		for index := 0; index < 256; index++ {
+			client.SecInfoUpdChan <- commands.SecInfoUpd{SecId: index + 1}
+		}
+	}()
+	drainedWhileRestoring := false
+	select {
+	case <-sent:
+		drainedWhileRestoring = true
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(releaseRestore)
+	if !drainedWhileRestoring {
+		select {
+		case <-sent:
+		case <-time.After(time.Second):
+			t.Fatal("event producer remained blocked after subscription restore")
+		}
+	}
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("processTransaq error = %v", err)
+	}
+	if !drainedWhileRestoring {
+		t.Fatal("TRANSAQ event channel filled while subscription restore was blocked")
+	}
+}
+
+func TestProcessTransaqDrainsEventsWhileClickHouseWorkerIsSlow(t *testing.T) {
+	client := newTestTCClient(newFakeConnectServiceClient())
+	handlerStarted := make(chan struct{})
+	releaseHandler := make(chan struct{})
+	processCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- processTransaq(processCtx, client, reconnectConfig{
+			terminalRetryInterval: time.Hour,
+			restore:               func(*tcClient.TCClient) error { return nil },
+			eventHandlers: transaqEventHandlers{
+				allTrades: func(context.Context, commands.AllTrades) error {
+					select {
+					case <-handlerStarted:
+					default:
+						close(handlerStarted)
+					}
+					<-releaseHandler
+					return nil
+				},
+			},
+		})
+	}()
+
+	client.AllTradesChan <- commands.AllTrades{}
+	select {
+	case <-handlerStarted:
+	case <-time.After(time.Second):
+		t.Fatal("ClickHouse worker did not start")
+	}
+
+	sent := make(chan struct{})
+	go func() {
+		defer close(sent)
+		for index := 0; index < 256; index++ {
+			client.AllTradesChan <- commands.AllTrades{}
+		}
+	}()
+	select {
+	case <-sent:
+	case <-time.After(time.Second):
+		close(releaseHandler)
+		cancel()
+		<-done
+		t.Fatal("TRANSAQ event channel filled behind a slow ClickHouse worker")
+	}
+
+	close(releaseHandler)
 	cancel()
 	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Fatalf("processTransaq error = %v", err)
