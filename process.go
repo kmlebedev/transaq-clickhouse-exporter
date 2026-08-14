@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,16 +12,43 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func processTransaq(processCtx context.Context, client *tcClient.TCClient, config reconnectConfig) error {
-	if config.terminalRetryInterval <= 0 {
-		return fmt.Errorf("terminal reconnect interval must be positive: %s", config.terminalRetryInterval)
+var errResponseStreamClosed = errors.New("txmlconnector response stream closed")
+
+type transaqSessionConfig struct {
+	restore       func(*tcClient.TCClient) error
+	eventHandlers transaqEventHandlers
+}
+
+func defaultTransaqSessionConfig() transaqSessionConfig {
+	return transaqSessionConfig{
+		restore:       restoreSubscriptions,
+		eventHandlers: defaultTransaqEventHandlers(),
+	}
+}
+
+func runTransaq(
+	runCtx context.Context,
+	newClient tcClient.ClientFactory,
+	sessionConfig transaqSessionConfig,
+	reconnectConfig tcClient.ReconnectConfig,
+) error {
+	return tcClient.RunWithReconnect(
+		runCtx,
+		newClient,
+		func(sessionCtx context.Context, client *tcClient.TCClient) error {
+			return processTransaq(sessionCtx, client, sessionConfig)
+		},
+		reconnectConfig,
+	)
+}
+
+func processTransaq(processCtx context.Context, client *tcClient.TCClient, config transaqSessionConfig) error {
+	if config.restore == nil {
+		return errors.New("TRANSAQ subscription restore callback is required")
 	}
 	eventWorkers := startTransaqEventWorkers(processCtx, client, config.eventHandlers)
 	defer eventWorkers.stop()
-	terminalConnected := false
 	subscriptionsRestored := false
-	ticker := time.NewTicker(config.terminalRetryInterval)
-	defer ticker.Stop()
 	for {
 		select {
 		case <-processCtx.Done():
@@ -30,39 +58,18 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 		case status := <-eventWorkers.serverStatuses:
 			switch status.Connected {
 			case "true":
-				wasConnected := terminalConnected
-				terminalConnected = true
-				if wasConnected && subscriptionsRestored {
+				if subscriptionsRestored {
 					continue
 				}
 				if err := config.restore(client); err != nil {
-					subscriptionsRestored = false
-					log.Errorf("Restore TRANSAQ subscriptions: %v", err)
-				} else {
-					subscriptionsRestored = true
-					log.Info("TRANSAQ subscriptions restored")
+					return fmt.Errorf("restore TRANSAQ subscriptions: %w", err)
 				}
+				subscriptionsRestored = true
+				log.Info("TRANSAQ subscriptions restored")
 			case "false", "error":
-				terminalConnected = false
-				subscriptionsRestored = false
-				log.Warnf("txmlconnector not connected %+v\n", status)
+				return fmt.Errorf("TRANSAQ terminal is not connected: %+v", status)
 			default:
 				log.Infof("Status %+v", status)
-			}
-		case <-ticker.C:
-			if terminalConnected {
-				if !subscriptionsRestored {
-					if err := config.restore(client); err != nil {
-						log.Errorf("Restore TRANSAQ subscriptions: %v", err)
-					} else {
-						subscriptionsRestored = true
-						log.Info("TRANSAQ subscriptions restored")
-					}
-				}
-				continue
-			}
-			if err := client.Connect(); err != nil {
-				log.Errorf("Reconnect TRANSAQ terminal: %v", err)
 			}
 		case resp := <-client.ResponseChannel:
 			switch resp {
