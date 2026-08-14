@@ -115,6 +115,8 @@ func updateSecurities() {
 	if err != nil {
 		log.Error(err)
 	}
+	// TODO update allTRades if get message
+	// Feb 21 12:01:57 rock-5b transaq_clickhouse_exporter[3732508]: time="2025-02-21T12:01:57+05:00" level=info msg="secInfoUpd {XMLName:{Space: Local:sec_info_upd} SecId:30338 Market:4 SecCode:CR9BC5 MinPrice:0 MaxPrice:0 BuyDeposit:0 Sell
 	for _, sec := range tc.Data.Securities.Items {
 		exportSecBoardFound := false
 		if slices.Contains(exportSecBoards, sec.Board) {
