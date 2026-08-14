@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -15,6 +16,17 @@ import (
 	"sync"
 	"time"
 )
+
+type SubSecurity struct {
+	XMLName xml.Name `xml:"security"`
+	Board   string   `xml:"board,omitempty"`
+	SecCode string   `xml:"seccode,omitempty"`
+}
+
+type SubSecAllTrades struct {
+	XMLName xml.Name      `xml:"alltrades,omitempty"`
+	Items   []SubSecurity `xml:"security,omitempty"`
+}
 
 var (
 	ctx                  = context.Background()
@@ -68,13 +80,7 @@ func init() {
 	}
 }
 
-func main() {
-	defer func() {
-		_ = tc.Disconnect()
-		tc.Close()
-		_ = connect.Close()
-	}()
-
+func updateSecurities() {
 	exportAllTradesSec := []string{}
 	if envAllTrades := os.Getenv("EXPORT_ALL_TRADES"); envAllTrades != "" {
 		for _, sec := range strings.Split(envAllTrades, ",") {
@@ -85,19 +91,6 @@ func main() {
 			exportAllTradesSec = append(exportAllTradesSec, sec)
 		}
 	}
-
-	go processTransaq()
-
-	log.Infof("Wait txmlconnector ")
-	for {
-		if tc.Data.ServerStatus.Connected == "true" {
-			log.Infof(" connected\n")
-			break
-		}
-		fmt.Printf(".")
-		time.Sleep(5 * time.Second)
-	}
-
 	// Get History data for all sec
 	exportCandleCount := ExportCandleCount
 	if eCandleCount, err := strconv.Atoi(os.Getenv("EXPORT_CANDLE_COUNT")); err == nil && eCandleCount > -2 {
@@ -122,7 +115,8 @@ func main() {
 	if err != nil {
 		log.Error(err)
 	}
-
+	// TODO update allTRades if get message
+	// Feb 21 12:01:57 rock-5b transaq_clickhouse_exporter[3732508]: time="2025-02-21T12:01:57+05:00" level=info msg="secInfoUpd {XMLName:{Space: Local:sec_info_upd} SecId:30338 Market:4 SecCode:CR9BC5 MinPrice:0 MaxPrice:0 BuyDeposit:0 Sell
 	for _, sec := range tc.Data.Securities.Items {
 		exportSecBoardFound := false
 		if slices.Contains(exportSecBoards, sec.Board) {
@@ -130,6 +124,7 @@ func main() {
 		}
 		if exportSecBoardFound && slices.Contains(exportAllTradesSec, sec.SecCode) {
 			allTrades.Items = append(allTrades.Items, sec.SecId)
+			//allTrades.Items = append(allTrades.Items, SubSecurity{Board: sec.Board, SecCode: sec.SecCode})
 		}
 		if sec.SecType == "BOND" {
 			for _, secInfoName := range exportSecInfoNames {
@@ -152,6 +147,7 @@ func main() {
 			uint8(sec.Decimals),
 			float32(sec.MinStep),
 			uint8(sec.LotSize),
+			uint8(sec.LotDivider),
 			float32(sec.PointCost),
 			sec.SecType,
 			uint8(sec.QuotesType)); err != nil {
@@ -225,6 +221,26 @@ func main() {
 		if err := batchSec.Send(); err != nil {
 			log.Error(err)
 		}
+	}
+}
+
+func main() {
+	defer func() {
+		_ = tc.Disconnect()
+		tc.Close()
+		_ = connect.Close()
+	}()
+
+	go processTransaq()
+
+	log.Infof("Wait txmlconnector ")
+	for {
+		if tc.Data.ServerStatus.Connected == "true" {
+			log.Infof(" connected\n")
+			break
+		}
+		fmt.Printf(".")
+		time.Sleep(5 * time.Second)
 	}
 	<-tc.ShutdownChannel
 }

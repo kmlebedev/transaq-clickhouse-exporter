@@ -20,6 +20,8 @@ func processTransaq() {
 			switch status.Connected {
 			case "true":
 				log.Infof("server status is true")
+				updateSecurities()
+				log.Infof("Securities updated")
 				if err := tc.SendCommand(commands.Command{
 					Id:         "subscribe",
 					Quotations: quotations,
@@ -27,6 +29,7 @@ func processTransaq() {
 				}); err != nil {
 					log.Error("SendCommand subscribe: ", err)
 				}
+				log.Infof("Subscribe trades %+v", allTrades)
 				for _, secId := range getSecuritiesInfo {
 					if err := tc.SendCommand(commands.Command{
 						Id:    "get_securities_info",
@@ -35,6 +38,7 @@ func processTransaq() {
 						log.Error("SendCommand get_securities_info: ", err)
 					}
 				}
+				log.Infof("Get Securities info %+v", getSecuritiesInfo)
 			case "error":
 				log.Warnf("txmlconnector not connected %+v\n", status)
 			default:
@@ -100,6 +104,7 @@ func processTransaq() {
 					}
 				}
 				log.Infof("Positions: \n%+v\n", tc.Data.Positions)
+
 			case "candles":
 				batch, _ := connect.PrepareBatch(ctx, ChCandlesInsertQuery)
 				dataCandleCountLock.Lock()
