@@ -65,7 +65,7 @@ func openClickHouse(openCtx context.Context) (driver.Conn, error) {
 			break
 		}
 		if attempt < 10 {
-			if err := waitForContext(openCtx, 3*time.Second); err != nil {
+			if err := waitForClickHouseRetry(openCtx, 3*time.Second); err != nil {
 				_ = conn.Close()
 				return nil, err
 			}
@@ -83,6 +83,17 @@ func openClickHouse(openCtx context.Context) (driver.Conn, error) {
 		}
 	}
 	return conn, nil
+}
+
+func waitForClickHouseRetry(waitCtx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-waitCtx.Done():
+		return waitCtx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func updateSecurities(client *tcClient.TCClient) error {
@@ -248,7 +259,12 @@ func main() {
 	}
 	defer func() { _ = connect.Close() }()
 
-	if err := superviseTransaq(runCtx, tcClient.NewTCClient, defaultReconnectConfig()); err != nil {
+	if err := runTransaq(
+		runCtx,
+		tcClient.NewTCClient,
+		defaultTransaqSessionConfig(),
+		tcClient.DefaultReconnectConfig(),
+	); err != nil {
 		log.Fatal(err)
 	}
 }

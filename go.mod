@@ -1,11 +1,12 @@
 module github.com/kmlebedev/transaq-clickhouse-exporter
 
-go 1.26.4
+go 1.26.6
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
-	github.com/kmlebedev/txmlconnector v1.26.8
-	github.com/sirupsen/logrus v1.9.4
+	github.com/kmlebedev/txmlconnector v1.26.10
+	github.com/sirupsen/logrus v1.10.0
+	google.golang.org/grpc v1.83.0
 )
 
 require (
@@ -18,7 +19,6 @@ require (
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/paulmach/orb v0.13.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.27 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
@@ -26,8 +26,6 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20241206012308-a4fef0638583 // indirect
-	google.golang.org/grpc v1.68.1 // indirect
-	google.golang.org/protobuf v1.35.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 )
