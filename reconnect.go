@@ -22,6 +22,7 @@ type reconnectConfig struct {
 	sessionStableAfter    time.Duration
 	disconnectTimeout     time.Duration
 	restore               func(*tcClient.TCClient) error
+	eventHandlers         transaqEventHandlers
 }
 
 func defaultReconnectConfig() reconnectConfig {
@@ -41,6 +42,7 @@ func defaultReconnectConfig() reconnectConfig {
 		sessionStableAfter:    time.Minute,
 		disconnectTimeout:     2 * time.Second,
 		restore:               restoreSubscriptions,
+		eventHandlers:         defaultTransaqEventHandlers(),
 	}
 }
 

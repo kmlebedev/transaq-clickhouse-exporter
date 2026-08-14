@@ -15,6 +15,8 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 	if config.terminalRetryInterval <= 0 {
 		return fmt.Errorf("terminal reconnect interval must be positive: %s", config.terminalRetryInterval)
 	}
+	eventWorkers := startTransaqEventWorkers(processCtx, client, config.eventHandlers)
+	defer eventWorkers.stop()
 	terminalConnected := false
 	subscriptionsRestored := false
 	ticker := time.NewTicker(config.terminalRetryInterval)
@@ -25,9 +27,7 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 			return processCtx.Err()
 		case <-client.ShutdownChannel:
 			return errResponseStreamClosed
-		case upd := <-client.SecInfoUpdChan:
-			log.Infof("secInfoUpd %+v", upd)
-		case status := <-client.ServerStatusChan:
+		case status := <-eventWorkers.serverStatuses:
 			switch status.Connected {
 			case "true":
 				wasConnected := terminalConnected
@@ -63,24 +63,6 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 			}
 			if err := client.Connect(); err != nil {
 				log.Errorf("Reconnect TRANSAQ terminal: %v", err)
-			}
-		case trades := <-client.AllTradesChan:
-			for _, trade := range trades.Items {
-				if err := insertTrade(&trade); err != nil {
-					log.Errorf("trades async insert trade: %+v: %+v", trade, err)
-				}
-			}
-		case quotes := <-client.QuotesChan:
-			{
-				for _, quote := range quotes.Items {
-					if err := insertQuote(&quote, &quotes.Time); err != nil {
-						log.Errorf("trades async insert quote: %+v: %+v", quote, err)
-					}
-				}
-			}
-		case secInfo := <-client.SecInfoChan:
-			if err := insertSecInfo(&secInfo); err != nil {
-				log.Errorf("trades async insert secInfo: %+v: %+v", secInfo, err)
 			}
 		case resp := <-client.ResponseChannel:
 			switch resp {
