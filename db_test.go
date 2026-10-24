@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,8 +12,20 @@ import (
 
 type recordingConn struct {
 	driver.Conn
-	query string
-	batch *recordingBatch
+	query     string
+	batch     *recordingBatch
+	asyncArgs []any
+}
+
+func (conn *recordingConn) AsyncInsert(
+	_ context.Context,
+	stringQuery string,
+	_ bool,
+	args ...any,
+) error {
+	conn.query = stringQuery
+	conn.asyncArgs = args
+	return nil
 }
 
 func (conn *recordingConn) PrepareBatch(
@@ -99,5 +112,32 @@ func TestInsertQuotesUsesOneBatchForWholeMessage(t *testing.T) {
 	}
 	if !recorder.batch.sent {
 		t.Fatal("quote batch was not sent")
+	}
+}
+
+func TestInsertSecInfoPassesOneValuePerPlaceholder(t *testing.T) {
+	previousConnect := connect
+	recorder := &recordingConn{}
+	connect = recorder
+	defer func() { connect = previousConnect }()
+
+	err := insertSecInfo(context.Background(), commands.SecInfo{
+		SecId:     4917,
+		SecName:   "ОФЗ-ПД 26207 03/02/27",
+		SecCode:   "SU26207RMFS9",
+		Market:    1,
+		MatDate:   "03.02.2027",
+		FaceValue: 1000,
+		Isin:      "RU000A0JS3W6",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	placeholders := strings.Count(ChSecInfoInsertQuery, "?")
+	if placeholders != 28 {
+		t.Fatalf("sec_info placeholders = %d, want 28", placeholders)
+	}
+	if len(recorder.asyncArgs) != placeholders {
+		t.Fatalf("sec_info values = %d, want %d", len(recorder.asyncArgs), placeholders)
 	}
 }
