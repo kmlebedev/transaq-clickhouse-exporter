@@ -19,6 +19,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type secInfoKey struct {
+	SecID   int
+	Market  int
+	SecCode string
+}
+
 var (
 	ctx                  = context.Background()
 	connect              driver.Conn
@@ -29,7 +35,7 @@ var (
 	dataCandleCountLock  = sync.RWMutex{}
 	isAllTradesPositions = false
 	allTrades            = commands.SubAllTrades{}
-	getSecuritiesInfo    = []int{}
+	getSecuritiesInfo    = []secInfoKey{}
 	exportSecInfoNames   = []string{}
 )
 
@@ -96,6 +102,13 @@ func waitForClickHouseRetry(waitCtx context.Context, delay time.Duration) error 
 	}
 }
 
+func appendSecInfo(secID, market int, secCode string) {
+	key := secInfoKey{SecID: secID, Market: market, SecCode: secCode}
+	if !slices.Contains(getSecuritiesInfo, key) {
+		getSecuritiesInfo = append(getSecuritiesInfo, key)
+	}
+}
+
 func updateSecurities(client *tcClient.TCClient) error {
 	isAllTradesPositions = false
 	quotations = quotations[:0]
@@ -113,6 +126,7 @@ func updateSecurities(client *tcClient.TCClient) error {
 			exportAllTradesSec = append(exportAllTradesSec, sec)
 		}
 	}
+	allTradesAll := slices.Contains(exportAllTradesSec, "ALL")
 	// Get History data for all sec
 	exportCandleCount := ExportCandleCount
 	if eCandleCount, err := strconv.Atoi(os.Getenv("EXPORT_CANDLE_COUNT")); err == nil && eCandleCount > -2 {
@@ -129,6 +143,7 @@ func updateSecurities(client *tcClient.TCClient) error {
 	if names := os.Getenv("EXPORT_SEC_INFO_NAMES"); names != "" {
 		exportSecInfoNames = strings.Split(names, ",")
 	}
+	secInfoAll := slices.Contains(exportSecInfoNames, "ALL")
 	exportPeriodSeconds := []string{}
 	if ePeriodSeconds := os.Getenv("EXPORT_PERIOD_SECONDS"); ePeriodSeconds != "" {
 		exportPeriodSeconds = strings.Split(ePeriodSeconds, ",")
@@ -144,14 +159,20 @@ func updateSecurities(client *tcClient.TCClient) error {
 		if slices.Contains(exportSecBoards, sec.Board) {
 			exportSecBoardFound = true
 		}
-		if exportSecBoardFound && slices.Contains(exportAllTradesSec, sec.SecCode) {
-			allTrades.Items = append(allTrades.Items, sec.SecId)
-			//allTrades.Items = append(allTrades.Items, SubSecurity{Board: sec.Board, SecCode: sec.SecCode})
+		if exportSecBoardFound && (allTradesAll || slices.Contains(exportAllTradesSec, sec.SecCode)) {
+			if !slices.Contains(allTrades.Items, sec.SecId) {
+				allTrades.Items = append(allTrades.Items, sec.SecId)
+			}
 		}
 		if sec.SecType == "BOND" {
-			for _, secInfoName := range exportSecInfoNames {
-				if strings.HasSuffix(sec.ShortName, secInfoName) {
-					getSecuritiesInfo = append(getSecuritiesInfo, sec.SecId)
+			if secInfoAll {
+				appendSecInfo(sec.SecId, sec.Market, sec.SecCode)
+			} else {
+				for _, secInfoName := range exportSecInfoNames {
+					if strings.HasSuffix(sec.ShortName, secInfoName) {
+						appendSecInfo(sec.SecId, sec.Market, sec.SecCode)
+						break
+					}
 				}
 			}
 		}
