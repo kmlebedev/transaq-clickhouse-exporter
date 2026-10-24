@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	tcClient "github.com/kmlebedev/txmlconnector/client"
 	"github.com/kmlebedev/txmlconnector/client/commands"
+	pb "github.com/kmlebedev/txmlconnector/proto"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -197,15 +199,33 @@ func restoreSubscriptions(client *tcClient.TCClient) error {
 	}
 	log.Infof("Subscribe trades %+v", allTrades)
 
-	for _, secID := range getSecuritiesInfo {
-		if err := client.SendCommand(commands.Command{
-			Id:    "get_securities_info",
-			SecId: secID,
-		}); err != nil {
-			return fmt.Errorf("get securities info for %d: %w", secID, err)
+	for _, item := range getSecuritiesInfo {
+		if err := sendSecuritiesInfo(client, item); err != nil {
+			return fmt.Errorf("get securities info for %d: %w", item.SecID, err)
 		}
 	}
 	log.Infof("Get securities info %+v", getSecuritiesInfo)
+	return nil
+}
+
+func sendSecuritiesInfo(client *tcClient.TCClient, item secInfoKey) error {
+	var message string
+	if item.SecCode != "" {
+		message = fmt.Sprintf(`<command id="get_securities_info"><security><market>%d</market><seccode>%s</seccode></security></command>`, item.Market, item.SecCode)
+	} else {
+		message = fmt.Sprintf(`<command id="get_securities_info"><secid>%d</secid></command>`, item.SecID)
+	}
+	response, err := client.Client.SendCommand(ctx, &pb.SendCommandRequest{Message: message})
+	if err != nil {
+		return err
+	}
+	result := commands.Result{}
+	if err := xml.Unmarshal([]byte(response.GetMessage()), &result); err != nil {
+		return fmt.Errorf("decode response %q: %w", response.GetMessage(), err)
+	}
+	if result.Success != "true" {
+		return fmt.Errorf("TRANSAQ command failed: %s", result.Message)
+	}
 	return nil
 }
 
