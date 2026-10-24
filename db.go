@@ -18,7 +18,7 @@ const (
 	ChCandlesInsertQuery    = "INSERT INTO transaq_candles"
 	ChSecuritiesInsertQuery = "INSERT INTO transaq_securities"
 	ChTradesInsertQuery     = "INSERT INTO transaq_trades"
-	ChSecInfoInsertQuery    = "INSERT INTO transaq_securities_info VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	ChSecInfoInsertQuery    = "INSERT INTO transaq_securities_info VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 	ChQuotesInsert          = "INSERT INTO transaq_quotes"
 
 	candlesDDL = `CREATE TABLE IF NOT EXISTS transaq_candles (
