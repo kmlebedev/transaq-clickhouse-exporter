@@ -26,6 +26,8 @@ github.com/klauspost/compress v1.19.1 h1:VsB4HPswih7mmZ8WleSFQ75c/Ui1M4trX5oAsJn
 github.com/klauspost/compress v1.19.1/go.mod h1:cwPg85FWrGar70rWktvGQj8/hthj3wpl0PGDogxkrSQ=
 github.com/kmlebedev/txmlconnector v1.26.11 h1:o+nfabA2GEjFAQg0sEHTyHUwiafBa+85QB+ONivajEM=
 github.com/kmlebedev/txmlconnector v1.26.11/go.mod h1:9UjroEp6yf98kjk5U1UoIVC2l0ip1pGp5T4PMI0++7s=
+github.com/kmlebedev/txmlconnector v1.26.12 h1:sDKBTV8G1qHvY0J8YnJAtcvkJtFbWtQapDH3/h11n8Y=
+github.com/kmlebedev/txmlconnector v1.26.12/go.mod h1:9UjroEp6yf98kjk5U1UoIVC2l0ip1pGp5T4PMI0++7s=
 github.com/paulmach/orb v0.13.0 h1:r7n7mQGGF+cj/CbcivEj9J3HGK+XR+yXnvzRdq9saIw=
 github.com/paulmach/orb v0.13.0/go.mod h1:6scRWINywA2Jf05dcjOfLfxrUIMECvTSG2MVbRLxu/k=
 github.com/pierrec/lz4/v4 v4.1.27 h1:+PhzhWDrjRj89TH2sw43nE3+4+W8lSxIuQadEHZyjUk=

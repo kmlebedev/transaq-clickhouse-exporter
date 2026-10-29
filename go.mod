@@ -1,10 +1,10 @@
 module github.com/kmlebedev/transaq-clickhouse-exporter
 
-go 1.26.6
+go 1.27.2
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
-	github.com/kmlebedev/txmlconnector v1.26.11
+	github.com/kmlebedev/txmlconnector v1.26.12
 	github.com/sirupsen/logrus v1.10.0
 	google.golang.org/grpc v1.83.0
 )
