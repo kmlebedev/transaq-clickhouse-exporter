@@ -109,7 +109,11 @@ func appendSecInfo(secID, market int, secCode string) {
 	}
 }
 
-func updateSecurities(client *tcClient.TCClient) error {
+func updateSecurities(client *tcClient.TCClient, catalog []commands.Security) error {
+	if len(catalog) == 0 {
+		// Клиент без потока PortfolioUpdates: каталог берётся из Data как раньше.
+		catalog = client.Data.Securities.Items
+	}
 	isAllTradesPositions = false
 	quotations = quotations[:0]
 	allTrades.Items = allTrades.Items[:0]
@@ -154,7 +158,7 @@ func updateSecurities(client *tcClient.TCClient) error {
 	}
 	// TODO update allTRades if get message
 	// Feb 21 12:01:57 rock-5b transaq_clickhouse_exporter[3732508]: time="2025-02-21T12:01:57+05:00" level=info msg="secInfoUpd {XMLName:{Space: Local:sec_info_upd} SecId:30338 Market:4 SecCode:CR9BC5 MinPrice:0 MaxPrice:0 BuyDeposit:0 Sell
-	for _, sec := range client.Data.Securities.Items {
+	for _, sec := range catalog {
 		exportSecBoardFound := false
 		if slices.Contains(exportSecBoards, sec.Board) {
 			exportSecBoardFound = true
@@ -268,6 +272,15 @@ func updateSecurities(client *tcClient.TCClient) error {
 	return nil
 }
 
+// portfolioUpdateBuffer включает типизированный поток обновлений клиента: по нему
+// собирается каталог securities (catalog.go). Запас нужен потому, что отправка в
+// поток блокирующая и медленный потребитель остановил бы разбор gRPC-стрима.
+const portfolioUpdateBuffer = 4096
+
+func newReconnectClient() (*tcClient.TCClient, error) {
+	return tcClient.NewTCClientWithOptions(tcClient.Options{PortfolioBuffer: portfolioUpdateBuffer})
+}
+
 func main() {
 	runCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -282,7 +295,7 @@ func main() {
 
 	if err := runTransaq(
 		runCtx,
-		tcClient.NewTCClient,
+		newReconnectClient,
 		defaultTransaqSessionConfig(),
 		tcClient.DefaultReconnectConfig(),
 	); err != nil {

@@ -19,13 +19,37 @@ var errResponseStreamClosed = errors.New("txmlconnector response stream closed")
 type transaqSessionConfig struct {
 	restore       func(*tcClient.TCClient) error
 	eventHandlers transaqEventHandlers
+	// catalog — накопитель каталога securities; nil означает «взять
+	// client.Data.Securities как есть» (используется тестами и клиентом без потока).
+	catalog *securitiesCatalog
+	// catalogQuiet — сколько каталог должен молчать, прежде чем подписываться.
+	catalogQuiet   time.Duration
+	catalogTimeout time.Duration
 }
 
 func defaultTransaqSessionConfig() transaqSessionConfig {
+	catalog := newSecuritiesCatalog()
 	return transaqSessionConfig{
-		restore:       restoreSubscriptions,
+		catalog:        catalog,
+		catalogQuiet:   5 * time.Second,
+		catalogTimeout: 2 * time.Minute,
+		restore: func(client *tcClient.TCClient) error {
+			return restoreSubscriptions(client, catalog.snapshot())
+		},
 		eventHandlers: defaultTransaqEventHandlers(),
 	}
+}
+
+// restoreWhenCatalogReady ждёт стабилизации каталога: подписка строится по
+// накопленному срезу, а не по последнему сообщению securities.
+func (c transaqSessionConfig) restoreWhenCatalogReady(ctx context.Context, client *tcClient.TCClient) error {
+	if c.catalog == nil || client.PortfolioUpdates() == nil {
+		return c.restore(client)
+	}
+	if err := c.catalog.waitQuiet(ctx, c.catalogQuiet, c.catalogTimeout); err != nil {
+		return err
+	}
+	return c.restore(client)
 }
 
 func runTransaq(
@@ -50,6 +74,7 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 	}
 	eventWorkers := startTransaqEventWorkers(processCtx, client, config.eventHandlers)
 	defer eventWorkers.stop()
+	startSecuritiesCatalogWorker(processCtx, client, config.catalog)
 	subscriptionsRestored := false
 	for {
 		select {
@@ -63,7 +88,7 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 				if subscriptionsRestored {
 					continue
 				}
-				if err := config.restore(client); err != nil {
+				if err := config.restoreWhenCatalogReady(processCtx, client); err != nil {
 					return fmt.Errorf("restore TRANSAQ subscriptions: %w", err)
 				}
 				subscriptionsRestored = true
@@ -183,11 +208,11 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 	}
 }
 
-func restoreSubscriptions(client *tcClient.TCClient) error {
+func restoreSubscriptions(client *tcClient.TCClient, items []commands.Security) error {
 	// A disconnect leaves an incomplete minute in memory. Do not merge fresh
 	// quotations into a candle that contains a gap in the source stream.
 	clear(quotationCandles)
-	if err := updateSecurities(client); err != nil {
+	if err := updateSecurities(client, items); err != nil {
 		return err
 	}
 	if err := client.SendCommand(commands.Command{
