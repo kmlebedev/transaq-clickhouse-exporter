@@ -104,7 +104,7 @@ deploy-staging-smoke:
 		echo "FAIL: $(STAGING_SERVICE) не active"; \
 		$(STAGING_SSH) $(STAGING_HOST) 'journalctl -u "$(STAGING_SERVICE)" -n 50 --no-pager'; exit 1; }
 	@ok=0; for i in $$(seq 1 90); do \
-		if $(STAGING_SSH) $(STAGING_HOST) 'journalctl -u "$(STAGING_SERVICE)" --since "5 min ago" --no-pager | grep -q "TRANSAQ subscriptions restored"'; then ok=1; break; fi; \
+		if $(STAGING_SSH) $(STAGING_HOST) 'since=$$(systemctl show -p ActiveEnterTimestamp --value "$(STAGING_SERVICE)"); journalctl -u "$(STAGING_SERVICE)" --since "$$since" --no-pager | grep -q "TRANSAQ subscriptions restored"'; then ok=1; break; fi; \
 		sleep 2; \
 	done; \
 	if [ "$$ok" != "1" ]; then \
