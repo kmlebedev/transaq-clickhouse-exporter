@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kmlebedev/txmlconnector/client/commands"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -111,6 +112,9 @@ const (
     `
 )
 
+// Биржевое время Transaq: метки сделок приходят в московском времени без зоны.
+var moscowLocation = time.FixedZone("MSK", 3*60*60)
+
 func insertQuotes(insertCtx context.Context, quotes commands.Quotes) error {
 	if len(quotes.Items) == 0 {
 		return nil
@@ -151,9 +155,16 @@ func insertTrades(insertCtx context.Context, trades commands.AllTrades) error {
 	}
 	defer batch.Close()
 	for _, trade := range trades.Items {
-		tradeTime, _ := time.Parse(tradeTimeLayout, trade.Time)
+		// Метка Transaq приходит биржевым временем без зоны. Строку в DateTime
+		// clickhouse-go разбирает в часовом поясе процесса (time.Local), поэтому на
+		// хосте с TZ America/New_York сделки уезжали на +7 часов; передаём момент.
+		tradeTime, err := time.ParseInLocation(tradeTimeLayout, trade.Time, moscowLocation)
+		if err != nil {
+			return fmt.Errorf("trade %d: parse time %q: %w", trade.TradeNo, trade.Time, err)
+		}
+		log.Debugf("trade %s/%s raw=%q parsed=%s", trade.SecCode, trade.Board, trade.Time, tradeTime.Format(time.RFC3339))
 		if err := batch.Append(
-			fmt.Sprint(tradeTime.Format(tableTimeLayout)),
+			tradeTime,
 			trade.SecId,
 			trade.SecCode,
 			trade.TradeNo,
