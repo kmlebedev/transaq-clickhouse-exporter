@@ -1,0 +1,20 @@
+[Unit]
+Description=Transaq ClickHouse exporter
+After=network-online.target txmlconnector-server.service
+Wants=txmlconnector-server.service
+
+[Service]
+Type=simple
+ExecStart=__TCE_BIN_DIR__/transaq-clickhouse-exporter
+WorkingDirectory=__TCE_BIN_DIR__
+Restart=always
+RestartSec=10
+User=root
+# Секреты (TC_LOGIN, TC_PASSWORD, CLICKHOUSE_URL) создаёт владелец один раз:
+# /etc/transaq-clickhouse-exporter.env, права 600. Деплой этот файл не создаёт и не печатает.
+EnvironmentFile=__TCE_SECRETS__
+# Несекретные фильтры подписки ставит `make deploy-staging-env`.
+EnvironmentFile=__TCE_EXPORT_ENV__
+
+[Install]
+WantedBy=multi-user.target
