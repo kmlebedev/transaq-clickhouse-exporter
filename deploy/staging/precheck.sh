@@ -24,6 +24,12 @@ ss -ltn | grep -q ':50051 ' \
 mode=$(stat -c '%a' "$SECRETS")
 [ "$mode" = "600" ] || fail "у $SECRETS права $mode, нужны 600"
 
+# systemd EnvironmentFile читает только VAR=value: строку «export VAR=value» он
+# пропускает с warning, и переменная в процесс не попадает.
+if grep -qE '^[[:space:]]*export[[:space:]]+[A-Za-z_][A-Za-z0-9_]*=' "$SECRETS"; then
+    fail "$SECRETS записан в shell-форме (export VAR=...): уберите префикс export — sed -i 's/^export //' $SECRETS"
+fi
+
 for key in "${EXPECTED_KEYS[@]}"; do
     value=$(grep -E "^${key}=" "$SECRETS" | head -1 | cut -d= -f2- | tr -d '"' || true)
     [ -n "$value" ] || fail "в $SECRETS пустой или отсутствует $key"
