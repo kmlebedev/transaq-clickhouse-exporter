@@ -255,3 +255,40 @@ func TestRunTransaqDelegatesReconnectToClient(t *testing.T) {
 		t.Fatalf("created clients = %d, want 2", created)
 	}
 }
+
+type secInfoFailingServiceClient struct {
+	fakeConnectServiceClient
+	failSecCode string
+	commands    []string
+}
+
+func (fake *secInfoFailingServiceClient) SendCommand(
+	_ context.Context,
+	request *pb.SendCommandRequest,
+	_ ...grpc.CallOption,
+) (*pb.SendCommandResponse, error) {
+	fake.commands = append(fake.commands, request.GetMessage())
+	if strings.Contains(request.GetMessage(), fake.failSecCode) {
+		return &pb.SendCommandResponse{
+			Message: `<result success="false"><message>'secid' or 'seccode' and 'market' elements not found</message></result>`,
+		}, nil
+	}
+	return &pb.SendCommandResponse{Message: `<result success="true"/>`}, nil
+}
+
+func TestRequestSecuritiesInfoSkipsUnknownInstrument(t *testing.T) {
+	rpc := &secInfoFailingServiceClient{failSecCode: "RU000A0JWYJ0"}
+	client := newTestTCClient(rpc)
+
+	failed := requestSecuritiesInfo(client, []secInfoKey{
+		{SecID: 1, Market: 1, SecCode: "SU26238RMFS4"},
+		{SecID: 1131, Market: 1, SecCode: "RU000A0JWYJ0"},
+		{SecID: 3, Market: 1, SecCode: "SU26240RMFS0"},
+	})
+	if failed != 1 {
+		t.Fatalf("failed = %d, want 1", failed)
+	}
+	if len(rpc.commands) != 3 {
+		t.Fatalf("sent %d get_securities_info commands, want 3: one unknown instrument must not stop the rest", len(rpc.commands))
+	}
+}
