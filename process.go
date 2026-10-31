@@ -224,13 +224,24 @@ func restoreSubscriptions(client *tcClient.TCClient, items []commands.Security) 
 	}
 	log.Infof("Subscribe trades %+v", allTrades)
 
-	for _, item := range getSecuritiesInfo {
+	failed := requestSecuritiesInfo(client, getSecuritiesInfo)
+	log.Infof("Get securities info: requested %d, failed %d", len(getSecuritiesInfo), failed)
+	return nil
+}
+
+// requestSecuritiesInfo запрашивает sec_info по каждому ключу и возвращает число
+// отказов. Отказ по одной бумаге (погашенная облигация в каталоге, «Failed to get
+// symbol») не рвёт сессию: подписка на сделки к этому моменту уже отправлена, а
+// sec_info — только справочник.
+func requestSecuritiesInfo(client *tcClient.TCClient, items []secInfoKey) int {
+	failed := 0
+	for _, item := range items {
 		if err := sendSecuritiesInfo(client, item); err != nil {
-			return fmt.Errorf("get securities info for %d: %w", item.SecID, err)
+			failed++
+			log.Warnf("get securities info for %d (%s, market %d): %v", item.SecID, item.SecCode, item.Market, err)
 		}
 	}
-	log.Infof("Get securities info %+v", getSecuritiesInfo)
-	return nil
+	return failed
 }
 
 func sendSecuritiesInfo(client *tcClient.TCClient, item secInfoKey) error {
