@@ -292,3 +292,22 @@ func TestRequestSecuritiesInfoSkipsUnknownInstrument(t *testing.T) {
 		t.Fatalf("sent %d get_securities_info commands, want 3: one unknown instrument must not stop the rest", len(rpc.commands))
 	}
 }
+
+func TestCheckSecuritiesInfo(t *testing.T) {
+	cases := []struct {
+		requested, failed int
+		wantErr           bool
+	}{
+		{requested: 0, failed: 0},
+		{requested: 4071, failed: 0},
+		{requested: 4071, failed: 1},
+		{requested: 4075, failed: 4030, wantErr: true}, // 2026-11-01 05:54 МСК
+		{requested: 2, failed: 1},
+	}
+	for _, tc := range cases {
+		err := checkSecuritiesInfo(tc.requested, tc.failed)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("checkSecuritiesInfo(%d, %d) = %v, wantErr %v", tc.requested, tc.failed, err, tc.wantErr)
+		}
+	}
+}

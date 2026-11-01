@@ -74,6 +74,9 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 	}
 	eventWorkers := startTransaqEventWorkers(processCtx, client, config.eventHandlers)
 	defer eventWorkers.stop()
+	if config.catalog != nil {
+		config.catalog.reset()
+	}
 	startSecuritiesCatalogWorker(processCtx, client, config.catalog)
 	subscriptionsRestored := false
 	for {
@@ -226,6 +229,17 @@ func restoreSubscriptions(client *tcClient.TCClient, items []commands.Security) 
 
 	failed := requestSecuritiesInfo(client, getSecuritiesInfo)
 	log.Infof("Get securities info: requested %d, failed %d", len(getSecuritiesInfo), failed)
+	return checkSecuritiesInfo(len(getSecuritiesInfo), failed)
+}
+
+// checkSecuritiesInfo отличает единичные отказы (погашенная бумага в каталоге)
+// от неготового брокера: в окне ночного рестарта сервер отдаёт промежуточный
+// каталог, отказывает по большинству sec_info и молча игнорирует подписку на
+// сделки. Тогда сессия пересоздаётся и подписка повторяется.
+func checkSecuritiesInfo(requested, failed int) error {
+	if requested > 0 && failed*2 > requested {
+		return fmt.Errorf("TRANSAQ catalog is not ready: securities info failed for %d of %d", failed, requested)
+	}
 	return nil
 }
 
