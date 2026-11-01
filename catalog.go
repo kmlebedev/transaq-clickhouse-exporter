@@ -49,6 +49,18 @@ func (c *securitiesCatalog) add(items []commands.Security) {
 	c.lastAt = time.Now()
 }
 
+// reset очищает каталог перед новой сессией. Transaq нумерует secid в пределах
+// сессии сервера: после ночного рестарта брокера номера сдвигаются, и подписка
+// по каталогу прошлой сессии уходит на чужие или несуществующие инструменты —
+// сервер её принимает, но сделок не шлёт.
+func (c *securitiesCatalog) reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.order = nil
+	clear(c.seen)
+	c.lastAt = time.Time{}
+}
+
 // snapshot отдаёт копию накопленного каталога.
 func (c *securitiesCatalog) snapshot() []commands.Security {
 	c.mu.Lock()
