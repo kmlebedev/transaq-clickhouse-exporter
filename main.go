@@ -61,7 +61,7 @@ func openClickHouse(openCtx context.Context) (driver.Conn, error) {
 
 	var pingErr error
 	for attempt := 1; attempt <= 10; attempt++ {
-		log.Infof("Connect to ClickHouse %s (attempt %d/10)", clickhouseUrl, attempt)
+		log.Infof("Connect to ClickHouse %s (attempt %d/10)", clickhouseTarget(clickhouseOptions), attempt)
 		if pingErr = conn.Ping(openCtx); pingErr != nil {
 			if exception, ok := pingErr.(*clickhouse.Exception); ok {
 				log.Infof("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
@@ -301,4 +301,10 @@ func main() {
 	); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// clickhouseTarget описывает подключение для лога без пароля: CLICKHOUSE_URL
+// несёт учётные данные, и печатать его целиком в journal нельзя.
+func clickhouseTarget(options *clickhouse.Options) string {
+	return fmt.Sprintf("%s/%s (user %s)", strings.Join(options.Addr, ","), options.Auth.Database, options.Auth.Username)
 }

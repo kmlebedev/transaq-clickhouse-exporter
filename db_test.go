@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/kmlebedev/txmlconnector/client/commands"
 )
@@ -139,5 +140,19 @@ func TestInsertSecInfoPassesOneValuePerPlaceholder(t *testing.T) {
 	}
 	if len(recorder.asyncArgs) != placeholders {
 		t.Fatalf("sec_info values = %d, want %d", len(recorder.asyncArgs), placeholders)
+	}
+}
+
+func TestClickHouseTargetHidesPassword(t *testing.T) {
+	options, err := clickhouse.ParseDSN("clickhouse://default:s3cret@localhost:9000/default")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := clickhouseTarget(options)
+	if strings.Contains(target, "s3cret") {
+		t.Fatalf("пароль попал в лог: %q", target)
+	}
+	if target != "localhost:9000/default (user default)" {
+		t.Fatalf("target = %q", target)
 	}
 }
