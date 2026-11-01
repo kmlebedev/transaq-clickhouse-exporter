@@ -99,12 +99,15 @@ deploy-staging: staging-precheck deploy-staging-binary deploy-staging-env deploy
 
 # Подписка восстанавливается не мгновенно: сначала connect, затем каталог
 # securities и только потом subscribe. Ждём строку в журнале до 3 минут.
+# Журнал фильтруется по InvocationID текущего запуска, а не по --since: строку
+# ActiveEnterTimestamp с аббревиатурой зоны (EST в день перехода с летнего
+# времени) journalctl не разбирает, и smoke падал при живой подписке.
 deploy-staging-smoke:
 	@$(STAGING_SSH) $(STAGING_HOST) 'systemctl is-active --quiet "$(STAGING_SERVICE)"' || { \
 		echo "FAIL: $(STAGING_SERVICE) не active"; \
 		$(STAGING_SSH) $(STAGING_HOST) 'journalctl -u "$(STAGING_SERVICE)" -n 50 --no-pager'; exit 1; }
 	@ok=0; for i in $$(seq 1 90); do \
-		if $(STAGING_SSH) $(STAGING_HOST) 'since=$$(systemctl show -p ActiveEnterTimestamp --value "$(STAGING_SERVICE)"); journalctl -u "$(STAGING_SERVICE)" --since "$$since" --no-pager | grep -q "TRANSAQ subscriptions restored"'; then ok=1; break; fi; \
+		if $(STAGING_SSH) $(STAGING_HOST) 'inv=$$(systemctl show -p InvocationID --value "$(STAGING_SERVICE)"); journalctl _SYSTEMD_INVOCATION_ID="$$inv" --no-pager | grep -q "TRANSAQ subscriptions restored"'; then ok=1; break; fi; \
 		sleep 2; \
 	done; \
 	if [ "$$ok" != "1" ]; then \
