@@ -100,3 +100,25 @@ func TestRestoreWhenCatalogReadyWithoutStream(t *testing.T) {
 		t.Fatal("без потока restore не вызван")
 	}
 }
+
+// После ночного рестарта брокер перенумеровывает secid. Каталог прошлой сессии
+// не должен попасть в подписку новой (наблюдалось 2026-11-01: подписка ушла со
+// вчерашними secid, сделок за сессию выходного дня не пришло).
+func TestProcessTransaqResetsCatalogPerSession(t *testing.T) {
+	catalog := newSecuritiesCatalog()
+	catalog.add([]commands.Security{{SecId: 536, SecCode: "SBER", Board: "TQBR"}})
+
+	client := newTestTCClient(newFakeConnectServiceClient())
+	client.ServerStatusChan <- commands.ServerStatus{Connected: "error"}
+	_ = processTransaq(context.Background(), client, transaqSessionConfig{
+		catalog: catalog,
+		restore: func(*tcClient.TCClient) error { return nil },
+	})
+
+	if catalog.size() != 0 {
+		t.Fatalf("каталог прошлой сессии не сброшен: %+v", catalog.snapshot())
+	}
+	if !catalog.lastUpdate().IsZero() {
+		t.Fatal("lastUpdate прошлой сессии не сброшен: waitQuiet сочтёт каталог готовым сразу")
+	}
+}
