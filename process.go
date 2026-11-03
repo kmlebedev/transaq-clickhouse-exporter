@@ -218,6 +218,9 @@ func restoreSubscriptions(client *tcClient.TCClient, items []commands.Security) 
 	if err := updateSecurities(client, items); err != nil {
 		return err
 	}
+	if err := checkSubscriptions(len(items), len(allTrades.Items), len(quotations)); err != nil {
+		return err
+	}
 	if err := client.SendCommand(commands.Command{
 		Id:         "subscribe",
 		Quotations: quotations,
@@ -230,6 +233,17 @@ func restoreSubscriptions(client *tcClient.TCClient, items []commands.Security) 
 	failed := requestSecuritiesInfo(client, getSecuritiesInfo)
 	log.Infof("Get securities info: requested %d, failed %d", len(getSecuritiesInfo), failed)
 	return checkSecuritiesInfo(len(getSecuritiesInfo), failed)
+}
+
+// checkSubscriptions не даёт подписаться на пустой список: в окне ночного
+// рестарта брокер может отдать промежуточный каталог без нужных бумаг. Тогда
+// подписка пуста, сервер отвечает «Неверный формат команды», а сессия живёт
+// без сделок до ручного рестарта. Ошибка пересоздаёт сессию.
+func checkSubscriptions(catalog, trades, quotes int) error {
+	if trades == 0 && quotes == 0 {
+		return fmt.Errorf("TRANSAQ catalog is not ready: none of %d securities match the export config", catalog)
+	}
+	return nil
 }
 
 // checkSecuritiesInfo отличает единичные отказы (погашенная бумага в каталоге)
