@@ -1,11 +1,13 @@
 // Command universe builds the export universe for the staging subscription:
-// all IMOEX constituents plus every OFZ traded on the TQOB board.
+// all IMOEX constituents, every OFZ traded on the TQOB board, the two nearest
+// quarterly contracts of the liquid index futures plus the perpetual IMOEXF,
+// and the most liquid money market funds.
 //
 // The list is checked into deploy/staging/universe-imoex-ofz.txt and rendered
 // into EXPORT_ALL_TRADES by `make deploy-staging-env`. A stale list does not
 // fail the exporter: it silently stops subscribing to instruments that entered
 // the index or were issued after the last refresh, so refresh it before the
-// quarterly rebalancing and on every new OFZ issue.
+// quarterly rebalancing, after every futures expiry and on every new OFZ issue.
 package main
 
 import (
@@ -22,7 +24,22 @@ import (
 const (
 	imoexURL = "https://iss.moex.com/iss/statistics/engines/stock/markets/index/analytics/IMOEX.json?iss.meta=off&limit=100"
 	ofzURL   = "https://iss.moex.com/iss/engines/stock/markets/bonds/boards/TQOB/securities.json?iss.meta=off&limit=100"
+	fortsURL = "https://iss.moex.com/iss/engines/futures/markets/forts/securities.json?iss.meta=off&iss.only=securities&securities.columns=SECID,ASSETCODE,LASTTRADEDATE"
 )
+
+// Two quarterly contracts per asset cover the roll: liquidity moves to the
+// next contract a week or two before expiry, and it is already subscribed.
+var (
+	indexFutureAssets = []string{"MIX", "RTS", "MXI"}
+	// IMOEXF is perpetual: its code never rolls.
+	fixedFutures = []string{"IMOEXF"}
+	// Money market funds trade on TQBR; ISS has no "money market" flag, so the
+	// list is fixed by turnover (ofz-market/1.7 spec §2).
+	moneyMarketFunds = []string{"AKMM", "LQDT", "SBMM"}
+)
+
+// quarterlyMonths are the FORTS month codes of March, June, September, December.
+const quarterlyMonths = "HMUZ"
 
 // block is one ISS response block: column names plus rows aligned to them.
 type block struct {
@@ -105,6 +122,74 @@ func ofzCodes(c *httpClient) ([]string, error) {
 	return columnValues(payload.Securities, "SECID")
 }
 
+// nearestFutures picks the n nearest live quarterly contracts of every asset,
+// in asset order and then by expiry. Calendar spreads, monthly contracts and
+// contracts past their last trading day are skipped; the expiry day itself
+// still trades. An asset without a live contract is an error: the ISS answer
+// is broken, not empty.
+func nearestFutures(b block, assets []string, today time.Time, n int) ([]string, error) {
+	index := make(map[string]int, len(b.Columns))
+	for i, name := range b.Columns {
+		index[name] = i
+	}
+	for _, column := range []string{"SECID", "ASSETCODE", "LASTTRADEDATE"} {
+		if _, ok := index[column]; !ok {
+			return nil, fmt.Errorf("column %q not found in %v", column, b.Columns)
+		}
+	}
+	type contract struct {
+		code   string
+		expiry time.Time
+	}
+	byAsset := make(map[string][]contract)
+	day := today.Format(time.DateOnly)
+	for _, row := range b.Data {
+		if len(row) < len(b.Columns) {
+			continue
+		}
+		code, _ := row[index["SECID"]].(string)
+		asset, _ := row[index["ASSETCODE"]].(string)
+		last, _ := row[index["LASTTRADEDATE"]].(string)
+		if len(code) != 4 || !strings.ContainsRune(quarterlyMonths, rune(code[2])) {
+			continue
+		}
+		if last < day {
+			continue
+		}
+		expiry, err := time.Parse(time.DateOnly, last)
+		if err != nil {
+			return nil, fmt.Errorf("%s: LASTTRADEDATE %q: %w", code, last, err)
+		}
+		byAsset[asset] = append(byAsset[asset], contract{code: code, expiry: expiry})
+	}
+	var codes []string
+	for _, asset := range assets {
+		contracts := byAsset[asset]
+		if len(contracts) == 0 {
+			return nil, fmt.Errorf("no live quarterly contract of %s", asset)
+		}
+		sort.Slice(contracts, func(i, j int) bool { return contracts[i].expiry.Before(contracts[j].expiry) })
+		for i := 0; i < n && i < len(contracts); i++ {
+			codes = append(codes, contracts[i].code)
+		}
+	}
+	return codes, nil
+}
+
+func futuresCodes(c *httpClient, today time.Time) ([]string, error) {
+	var payload struct {
+		Securities block `json:"securities"`
+	}
+	if err := c.getJSON(fortsURL, &payload); err != nil {
+		return nil, err
+	}
+	codes, err := nearestFutures(payload.Securities, indexFutureAssets, today, 2)
+	if err != nil {
+		return nil, err
+	}
+	return append(codes, fixedFutures...), nil
+}
+
 // buildUniverse merges both lists into a sorted set without duplicates.
 func buildUniverse(lists ...[]string) []string {
 	seen := make(map[string]struct{})
@@ -185,7 +270,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "read OFZ board TQOB: %v\n", err)
 		os.Exit(1)
 	}
-	fresh := buildUniverse(imoex, ofz)
+	futures, err := futuresCodes(client, time.Now())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read FORTS index futures: %v\n", err)
+		os.Exit(1)
+	}
+	fresh := buildUniverse(imoex, ofz, futures, moneyMarketFunds)
 	if len(imoex) < 20 {
 		fmt.Fprintf(os.Stderr, "IMOEX returned %d codes, refusing a universe that small\n", len(imoex))
 		os.Exit(1)
@@ -201,8 +291,8 @@ func main() {
 		os.Exit(1)
 	}
 	added, removed := diffUniverse(current, fresh)
-	fmt.Printf("IMOEX: %d, OFZ TQOB: %d, universe: %d; file %s: %d\n",
-		len(imoex), len(ofz), len(fresh), *out, len(current))
+	fmt.Printf("IMOEX: %d, OFZ TQOB: %d, futures: %d, funds: %d, universe: %d; file %s: %d\n",
+		len(imoex), len(ofz), len(futures), len(moneyMarketFunds), len(fresh), *out, len(current))
 	for _, code := range added {
 		fmt.Printf("+ %s\n", code)
 	}
