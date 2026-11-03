@@ -311,3 +311,21 @@ func TestCheckSecuritiesInfo(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckSubscriptions(t *testing.T) {
+	cases := []struct {
+		catalog, trades, quotes int
+		wantErr                 bool
+	}{
+		{catalog: 30000, trades: 105, quotes: 105},
+		{catalog: 30000, trades: 105, quotes: 0},
+		{catalog: 30000, trades: 0, quotes: 3},
+		{catalog: 1200, trades: 0, quotes: 0, wantErr: true}, // 2026-11-03 05:54 МСК
+	}
+	for _, tc := range cases {
+		err := checkSubscriptions(tc.catalog, tc.trades, tc.quotes)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("checkSubscriptions(%d, %d, %d) = %v, wantErr %v", tc.catalog, tc.trades, tc.quotes, err, tc.wantErr)
+		}
+	}
+}
