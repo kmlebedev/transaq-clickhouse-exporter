@@ -25,14 +25,18 @@ type transaqSessionConfig struct {
 	// catalogQuiet — сколько каталог должен молчать, прежде чем подписываться.
 	catalogQuiet   time.Duration
 	catalogTimeout time.Duration
+	// catalogLogEvery — как часто сверять каталог с подпиской для лога роста
+	// каталога; 0 выключает лог.
+	catalogLogEvery time.Duration
 }
 
 func defaultTransaqSessionConfig() transaqSessionConfig {
 	catalog := newSecuritiesCatalog()
 	return transaqSessionConfig{
-		catalog:        catalog,
-		catalogQuiet:   5 * time.Second,
-		catalogTimeout: 2 * time.Minute,
+		catalog:         catalog,
+		catalogQuiet:    5 * time.Second,
+		catalogTimeout:  2 * time.Minute,
+		catalogLogEvery: time.Minute,
 		restore: func(client *tcClient.TCClient) error {
 			return restoreSubscriptions(client, catalog.snapshot())
 		},
@@ -78,9 +82,20 @@ func processTransaq(processCtx context.Context, client *tcClient.TCClient, confi
 		config.catalog.reset()
 	}
 	startSecuritiesCatalogWorker(processCtx, client, config.catalog)
+	var catalogTicks <-chan time.Time
+	if config.catalog != nil && config.catalogLogEvery > 0 {
+		ticker := time.NewTicker(config.catalogLogEvery)
+		defer ticker.Stop()
+		catalogTicks = ticker.C
+	}
+	catalogLog := &catalogLogger{}
 	subscriptionsRestored := false
 	for {
 		select {
+		case now := <-catalogTicks:
+			if subscriptionsRestored {
+				catalogLog.log(config.catalog, now)
+			}
 		case <-processCtx.Done():
 			return processCtx.Err()
 		case <-client.ShutdownChannel:
