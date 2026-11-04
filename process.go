@@ -218,7 +218,7 @@ func restoreSubscriptions(client *tcClient.TCClient, items []commands.Security) 
 	if err := updateSecurities(client, items); err != nil {
 		return err
 	}
-	if err := checkSubscriptions(len(items), len(allTrades.Items), len(quotations)); err != nil {
+	if err := checkSubscriptions(len(items), allTradesCoverage.configured, allTradesCoverage.matched, len(quotations)); err != nil {
 		return err
 	}
 	if err := client.SendCommand(commands.Command{
@@ -235,13 +235,19 @@ func restoreSubscriptions(client *tcClient.TCClient, items []commands.Security) 
 	return checkSecuritiesInfo(len(getSecuritiesInfo), failed)
 }
 
-// checkSubscriptions не даёт подписаться на пустой список: в окне ночного
-// рестарта брокер может отдать промежуточный каталог без нужных бумаг. Тогда
-// подписка пуста, сервер отвечает «Неверный формат команды», а сессия живёт
-// без сделок до ручного рестарта. Ошибка пересоздаёт сессию.
-func checkSubscriptions(catalog, trades, quotes int) error {
-	if trades == 0 && quotes == 0 {
+// checkSubscriptions не даёт подписаться на пустой или частичный список: в окне
+// ночного рестарта брокер может отдать промежуточный каталог без нужных бумаг.
+// Пустая подписка (2026-11-03) получала «Неверный формат команды», частичная
+// (2026-11-04: 7 фьючерсов из 115 кодов, без акций и ОФЗ) проходила и писала
+// ленту без фондового рынка до ручного рестарта. Если в каталоге нет хотя бы
+// половины кодов EXPORT_ALL_TRADES, ошибка пересоздаёт сессию.
+func checkSubscriptions(catalog, configured, matched, quotes int) error {
+	if matched == 0 && quotes == 0 {
 		return fmt.Errorf("TRANSAQ catalog is not ready: none of %d securities match the export config", catalog)
+	}
+	if configured > 0 && matched*2 < configured {
+		return fmt.Errorf("TRANSAQ catalog is not ready: %d of %d configured codes found among %d securities",
+			matched, configured, catalog)
 	}
 	return nil
 }

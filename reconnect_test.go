@@ -314,18 +314,24 @@ func TestCheckSecuritiesInfo(t *testing.T) {
 
 func TestCheckSubscriptions(t *testing.T) {
 	cases := []struct {
-		catalog, trades, quotes int
-		wantErr                 bool
+		name                                 string
+		catalog, configured, matched, quotes int
+		wantErr                              bool
 	}{
-		{catalog: 30000, trades: 105, quotes: 105},
-		{catalog: 30000, trades: 105, quotes: 0},
-		{catalog: 30000, trades: 0, quotes: 3},
-		{catalog: 1200, trades: 0, quotes: 0, wantErr: true}, // 2026-11-03 05:54 МСК
+		{name: "полная вселенная", catalog: 30000, configured: 115, matched: 112, quotes: 0},
+		{name: "половина кодов", catalog: 30000, configured: 114, matched: 57},
+		{name: "EXPORT_ALL_TRADES=ALL", catalog: 30000, configured: 0, matched: 900},
+		{name: "только котировки", catalog: 30000, configured: 0, matched: 0, quotes: 3},
+		{name: "пустой каталог 2026-11-03", catalog: 1200, configured: 105, matched: 0, wantErr: true},
+		// 2026-11-04 05:55 МСК: брокер отдал каталог без акций и ОФЗ, подписка
+		// ушла на 7 фьючерсов, и до ручного рестарта лента писала только FUT.
+		{name: "частичный каталог 2026-11-04", catalog: 17998, configured: 115, matched: 7, wantErr: true},
 	}
 	for _, tc := range cases {
-		err := checkSubscriptions(tc.catalog, tc.trades, tc.quotes)
+		err := checkSubscriptions(tc.catalog, tc.configured, tc.matched, tc.quotes)
 		if (err != nil) != tc.wantErr {
-			t.Errorf("checkSubscriptions(%d, %d, %d) = %v, wantErr %v", tc.catalog, tc.trades, tc.quotes, err, tc.wantErr)
+			t.Errorf("%s: checkSubscriptions(%d, %d, %d, %d) = %v, wantErr %v", tc.name,
+				tc.catalog, tc.configured, tc.matched, tc.quotes, err, tc.wantErr)
 		}
 	}
 }

@@ -35,8 +35,11 @@ var (
 	dataCandleCountLock  = sync.RWMutex{}
 	isAllTradesPositions = false
 	allTrades            = commands.SubAllTrades{}
-	getSecuritiesInfo    = []secInfoKey{}
-	exportSecInfoNames   = []string{}
+	// allTradesCoverage — сколько кодов EXPORT_ALL_TRADES нашлось в каталоге
+	// последней подписки; configured = 0 при ALL или пустом списке.
+	allTradesCoverage  = struct{ configured, matched int }{}
+	getSecuritiesInfo  = []secInfoKey{}
+	exportSecInfoNames = []string{}
 )
 
 func init() {
@@ -131,6 +134,14 @@ func updateSecurities(client *tcClient.TCClient, catalog []commands.Security) er
 		}
 	}
 	allTradesAll := slices.Contains(exportAllTradesSec, "ALL")
+	matchedAllTrades := make(map[string]struct{})
+	defer func() {
+		allTradesCoverage.configured = len(exportAllTradesSec)
+		if allTradesAll {
+			allTradesCoverage.configured = 0
+		}
+		allTradesCoverage.matched = len(matchedAllTrades)
+	}()
 	// Get History data for all sec
 	exportCandleCount := ExportCandleCount
 	if eCandleCount, err := strconv.Atoi(os.Getenv("EXPORT_CANDLE_COUNT")); err == nil && eCandleCount > -2 {
@@ -167,6 +178,7 @@ func updateSecurities(client *tcClient.TCClient, catalog []commands.Security) er
 			if !slices.Contains(allTrades.Items, sec.SecId) {
 				allTrades.Items = append(allTrades.Items, sec.SecId)
 			}
+			matchedAllTrades[sec.SecCode] = struct{}{}
 		}
 		if sec.SecType == "BOND" {
 			if secInfoAll {
