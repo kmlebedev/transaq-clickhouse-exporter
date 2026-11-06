@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kmlebedev/txmlconnector/client/commands"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -14,14 +13,19 @@ import (
 // видно, что сессия жива и подписка не пропала.
 const catalogLogHeartbeat = time.Hour
 
+// catalogLogEvery — как часто сверять каталог с подпиской для лога роста
+// каталога. Переменная, чтобы тесты не ждали минуту.
+var catalogLogEvery = time.Minute
+
 // exportUniverse — доски и коды подписки из EXPORT_SEC_BOARDS/EXPORT_ALL_TRADES.
 type exportUniverse struct {
-	boards []string
-	codes  map[string]struct{}
-	all    bool
+	boards    []string
+	codes     map[string]struct{}
+	all       bool
+	positions bool
 }
 
-// exportUniverseFromEnv читает конфигурацию так же, как updateSecurities:
+// exportUniverseFromEnv читает конфигурацию так же, как buildExportPlan:
 // доски по умолчанию — TQBR, TQCB, FUT; "positions" — режим, а не код бумаги.
 func exportUniverseFromEnv() exportUniverse {
 	universe := exportUniverse{boards: []string{"TQBR", "TQCB", "FUT"}, codes: make(map[string]struct{})}
@@ -32,6 +36,7 @@ func exportUniverseFromEnv() exportUniverse {
 		for _, code := range strings.Split(codes, ",") {
 			switch code {
 			case "positions":
+				universe.positions = true
 			case "ALL":
 				universe.all = true
 			default:
@@ -54,7 +59,7 @@ type catalogSummary struct {
 	counts map[string]*boardCount
 }
 
-func summarizeCatalog(items []commands.Security, universe exportUniverse, subscribed map[int]struct{}) catalogSummary {
+func summarizeCatalog(items []Security, universe exportUniverse, subscribed map[int]struct{}) catalogSummary {
 	summary := catalogSummary{total: len(items), boards: universe.boards, counts: make(map[string]*boardCount)}
 	for _, board := range universe.boards {
 		summary.counts[board] = &boardCount{}
@@ -69,7 +74,7 @@ func summarizeCatalog(items []commands.Security, universe exportUniverse, subscr
 			continue
 		}
 		count.universe++
-		if _, ok = subscribed[item.SecId]; ok {
+		if _, ok = subscribed[item.SecID]; ok {
 			count.subscribed++
 		}
 	}
@@ -93,12 +98,8 @@ type catalogLogger struct {
 	lastAt time.Time
 }
 
-func (l *catalogLogger) log(catalog *securitiesCatalog, now time.Time) {
-	subscribed := make(map[int]struct{}, len(allTrades.Items))
-	for _, secID := range allTrades.Items {
-		subscribed[secID] = struct{}{}
-	}
-	summary := summarizeCatalog(catalog.snapshot(), exportUniverseFromEnv(), subscribed).String()
+func (l *catalogLogger) log(items []Security, subscribed map[int]struct{}, now time.Time) {
+	summary := summarizeCatalog(items, exportUniverseFromEnv(), subscribed).String()
 	if summary == l.last && now.Sub(l.lastAt) < catalogLogHeartbeat {
 		return
 	}

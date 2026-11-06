@@ -4,9 +4,9 @@ go 1.27.2
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
-	github.com/kmlebedev/txmlconnector v1.26.12
+	github.com/kmlebedev/txmlconnector v1.26.13-0.20261106054048-dd38d9361a42
 	github.com/sirupsen/logrus v1.10.0
-	google.golang.org/grpc v1.83.0
+	google.golang.org/grpc v1.84.0
 )
 
 require (
@@ -23,9 +23,9 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
