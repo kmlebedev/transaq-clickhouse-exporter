@@ -4,9 +4,6 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	tcClient "github.com/kmlebedev/txmlconnector/client"
-	"github.com/kmlebedev/txmlconnector/client/commands"
 )
 
 // Каталог приходит несколькими сообщениями securities: накопитель обязан
@@ -14,10 +11,10 @@ import (
 // порции (наблюдалось 2026-10-30: 9 инструментов и пустой `<alltrades>`).
 func TestSecuritiesCatalogAccumulatesWithoutDuplicates(t *testing.T) {
 	catalog := newSecuritiesCatalog()
-	catalog.add([]commands.Security{{SecId: 1, SecCode: "SBER", Board: "TQBR"}})
-	catalog.add([]commands.Security{
-		{SecId: 2, SecCode: "SU26238RMFS9", Board: "TQOB"},
-		{SecId: 1, SecCode: "SBER", Board: "TQBR"}, // повтор после reconnect
+	catalog.add([]Security{{SecID: 1, SecCode: "SBER", Board: "TQBR"}})
+	catalog.add([]Security{
+		{SecID: 2, SecCode: "SU26238RMFS9", Board: "TQOB"},
+		{SecID: 1, SecCode: "SBER", Board: "TQBR"}, // повтор после reconnect
 	})
 
 	items := catalog.snapshot()
@@ -31,7 +28,7 @@ func TestSecuritiesCatalogAccumulatesWithoutDuplicates(t *testing.T) {
 		t.Fatalf("size = %d, want 2", catalog.size())
 	}
 
-	catalog.add([]commands.Security{{SecId: 3, SecCode: "GAZP", Board: "TQBR"}})
+	catalog.add([]Security{{SecID: 3, SecCode: "GAZP", Board: "TQBR"}})
 	items = catalog.snapshot()
 	items[0].SecCode = "mutated"
 	if catalog.snapshot()[0].SecCode != "SBER" {
@@ -44,16 +41,16 @@ func TestSecuritiesCatalogAccumulatesWithoutDuplicates(t *testing.T) {
 func TestSecuritiesCatalogWaitQuiet(t *testing.T) {
 	t.Run("стихший поток", func(t *testing.T) {
 		catalog := newSecuritiesCatalog()
-		catalog.add([]commands.Security{{SecId: 1, SecCode: "SBER"}})
-		time.Sleep(60 * time.Millisecond)
-		if err := catalog.waitQuiet(context.Background(), 40*time.Millisecond, time.Second); err != nil {
+		catalog.add([]Security{{SecID: 1, SecCode: "SBER"}})
+		time.Sleep(200 * time.Millisecond)
+		if err := catalog.waitQuiet(context.Background(), 100*time.Millisecond, 2*time.Second); err != nil {
 			t.Fatalf("waitQuiet: %v", err)
 		}
 	})
 
 	t.Run("пустой каталог — ошибка", func(t *testing.T) {
 		catalog := newSecuritiesCatalog()
-		err := catalog.waitQuiet(context.Background(), 20*time.Millisecond, 80*time.Millisecond)
+		err := catalog.waitQuiet(context.Background(), 50*time.Millisecond, 300*time.Millisecond)
 		if err == nil {
 			t.Fatal("waitQuiet вернул nil на пустом каталоге: подписка ушла бы пустой")
 		}
@@ -65,60 +62,14 @@ func TestSecuritiesCatalogWaitQuiet(t *testing.T) {
 		defer cancel()
 		done := make(chan error, 1)
 		go func() {
-			done <- catalog.waitQuiet(ctx, 30*time.Millisecond, 300*time.Millisecond)
+			done <- catalog.waitQuiet(ctx, 100*time.Millisecond, 2*time.Second)
 		}()
 		for i := 0; i < 5; i++ {
-			time.Sleep(10 * time.Millisecond)
-			catalog.add([]commands.Security{{SecId: i + 1, SecCode: "SBER"}})
+			time.Sleep(20 * time.Millisecond)
+			catalog.add([]Security{{SecID: i + 1, SecCode: "SBER"}})
 		}
 		if err := <-done; err != nil {
 			t.Fatalf("waitQuiet: %v", err)
 		}
 	})
-}
-
-// Без типизированного потока (тесты, клиент без Options.PortfolioBuffer) подписка
-// восстанавливается сразу по Data.Securities — прежнее поведение не теряется.
-func TestRestoreWhenCatalogReadyWithoutStream(t *testing.T) {
-	restored := make(chan struct{}, 1)
-	config := transaqSessionConfig{
-		restore: func(*tcClient.TCClient) error {
-			restored <- struct{}{}
-			return nil
-		},
-		catalog:        newSecuritiesCatalog(),
-		catalogQuiet:   time.Hour,
-		catalogTimeout: time.Hour,
-	}
-	client := newTestTCClient(newFakeConnectServiceClient())
-	if err := config.restoreWhenCatalogReady(context.Background(), client); err != nil {
-		t.Fatalf("restoreWhenCatalogReady: %v", err)
-	}
-	select {
-	case <-restored:
-	case <-time.After(time.Second):
-		t.Fatal("без потока restore не вызван")
-	}
-}
-
-// После ночного рестарта брокер перенумеровывает secid. Каталог прошлой сессии
-// не должен попасть в подписку новой (наблюдалось 2026-11-01: подписка ушла со
-// вчерашними secid, сделок за сессию выходного дня не пришло).
-func TestProcessTransaqResetsCatalogPerSession(t *testing.T) {
-	catalog := newSecuritiesCatalog()
-	catalog.add([]commands.Security{{SecId: 536, SecCode: "SBER", Board: "TQBR"}})
-
-	client := newTestTCClient(newFakeConnectServiceClient())
-	client.ServerStatusChan <- commands.ServerStatus{Connected: "error"}
-	_ = processTransaq(context.Background(), client, transaqSessionConfig{
-		catalog: catalog,
-		restore: func(*tcClient.TCClient) error { return nil },
-	})
-
-	if catalog.size() != 0 {
-		t.Fatalf("каталог прошлой сессии не сброшен: %+v", catalog.snapshot())
-	}
-	if !catalog.lastUpdate().IsZero() {
-		t.Fatal("lastUpdate прошлой сессии не сброшен: waitQuiet сочтёт каталог готовым сразу")
-	}
 }

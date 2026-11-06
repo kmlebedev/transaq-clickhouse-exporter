@@ -8,7 +8,8 @@ KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=5min
 Environment=CLICKHOUSE_URL=clickhouse://default:passwd@127.0.0.1:9000/default
-Environment=TC_LOGIN=FZTC01307A
+Environment=TRANSAQ_BACKEND=native
+Environment=TC_LOGIN=transaq-login
 Environment=TC_PASSWORD=password
 Environment=TC_HOST=tr1.finam.ru
 Environment=TC_PORT=3900

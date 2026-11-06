@@ -50,6 +50,10 @@ func (batch *recordingBatch) Append(values ...any) error {
 	return nil
 }
 
+func (batch *recordingBatch) Rows() int {
+	return len(batch.rows)
+}
+
 func (batch *recordingBatch) Send() error {
 	batch.sent = true
 	return nil
@@ -116,7 +120,7 @@ func TestInsertQuotesUsesOneBatchForWholeMessage(t *testing.T) {
 	}
 }
 
-func TestInsertSecInfoPassesOneValuePerPlaceholder(t *testing.T) {
+func TestInsertSecInfoPassesOneValuePerColumn(t *testing.T) {
 	previousConnect := connect
 	recorder := &recordingConn{}
 	connect = recorder
@@ -134,12 +138,17 @@ func TestInsertSecInfoPassesOneValuePerPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	placeholders := strings.Count(ChSecInfoInsertQuery, "?")
-	if placeholders != 28 {
-		t.Fatalf("sec_info placeholders = %d, want 28", placeholders)
+	if recorder.query != ChSecInfoInsertQuery {
+		t.Fatalf("query = %q", recorder.query)
 	}
-	if len(recorder.asyncArgs) != placeholders {
-		t.Fatalf("sec_info values = %d, want %d", len(recorder.asyncArgs), placeholders)
+	if recorder.batch == nil || len(recorder.batch.rows) != 1 {
+		t.Fatalf("rows = %+v, want 1", recorder.batch)
+	}
+	if len(recorder.batch.rows[0]) != 28 {
+		t.Fatalf("sec_info columns = %d, want 28", len(recorder.batch.rows[0]))
+	}
+	if !recorder.batch.sent {
+		t.Fatal("sec_info batch was not sent")
 	}
 }
 
