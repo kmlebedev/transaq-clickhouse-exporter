@@ -1,7 +1,9 @@
 [Unit]
 Description=Transaq ClickHouse exporter
-After=network-online.target txmlconnector-server.service
-Wants=txmlconnector-server.service
+After=network-online.target
+Wants=network-online.target
+# Legacy-режим TRANSAQ_BACKEND=grpc дополнительно требует txmlconnector-server;
+# native-бэкенд (по умолчанию) подключается к TRANSAQ напрямую и от него не зависит.
 
 [Service]
 Type=simple

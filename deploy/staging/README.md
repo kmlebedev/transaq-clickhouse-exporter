@@ -1,9 +1,11 @@
 # Деплой `transaq-clickhouse-exporter` на `palmshell`
 
-Экспортёр — обычный linux/amd64-бинарник без CGO: он говорит по gRPC с
-`txmlconnector-server` (тот уже развёрнут на хосте под Wine, порт 50051) и пишет
-ленту сделок в ClickHouse. Деплой ставит бинарь, systemd-юнит и файл несекретных
-фильтров; секреты создаёт владелец один раз и деплой их не трогает.
+Экспортёр — обычный linux/amd64-бинарник без CGO. По умолчанию он подключается
+к TRANSAQ напрямую native-клиентом (`TRANSAQ_BACKEND=native`) и пишет ленту
+сделок в ClickHouse; legacy-режим `TRANSAQ_BACKEND=grpc` говорит с
+`txmlconnector-server` (DLL под Wine, порт 50051). Деплой ставит бинарь,
+systemd-юнит и файл несекретных фильтров; секреты создаёт владелец один раз и
+деплой их не трогает.
 
 ## Что где лежит
 
@@ -25,8 +27,9 @@ ssh palmshell 'install -m 600 /dev/null /etc/transaq-clickhouse-exporter.env'
 #   CLICKHOUSE_URL=clickhouse://<user>:<password>@127.0.0.1:9000/default
 ```
 
-`TC_HOST`, `TC_PORT`, `TC_TARGET`, фильтры и `LOG_LEVEL` — не секреты, они
-приезжают из `exporter.export.env.in` при деплое.
+`TRANSAQ_BACKEND`, `TC_HOST`, `TC_PORT`, `TC_TARGET`, фильтры и `LOG_LEVEL` —
+не секреты, они приезжают из `exporter.export.env.in` при деплое. `TC_TARGET`
+нужен только для `TRANSAQ_BACKEND=grpc`.
 
 ## Порядок
 
@@ -41,7 +44,9 @@ make rollback-staging    # вернуть .bak и перезапустить
 
 `deploy-staging` падает, если:
 
-- на хосте нет root, `txmlconnector-server.service` не active или `:50051` не слушается;
+- на хосте нет root;
+- для `native` нет TCP до `TC_HOST:TC_PORT`, а для `grpc` не active
+  `txmlconnector-server.service` или не слушается `:50051`;
 - нет файла секретов, у него права не `600`, пустой `TC_LOGIN`/`TC_PASSWORD`/`CLICKHOUSE_URL`;
 - ClickHouse не принимает `CLICKHOUSE_URL`;
 - после рестарта в журнале за 3 минуты нет `TRANSAQ subscriptions restored`.
@@ -77,8 +82,13 @@ MIX, RTS и MXI плюс вечный IMOEXF) и фонды денежного �
 
 ```bash
 ssh palmshell "clickhouse-client --query \"SELECT count(), max(time) FROM transaq_trades\""
-ssh palmshell 'journalctl -u transaq-clickhouse-exporter -n 100 --no-pager | grep -E "Subscribe|subscriptions|TRANSAQ"'
+ssh palmshell 'journalctl -u transaq-clickhouse-exporter -n 100 --no-pager | grep -E "TRANSAQ backend|Subscribe|subscriptions|TRANSAQ"'
 ```
+
+Откат на прежний gRPC-бэкенд: `TRANSAQ_BACKEND=grpc` в
+`/etc/transaq-clickhouse-exporter.export.env`, поднять
+`txmlconnector-server.service` и перезапустить экспортёр. Прежний бинарник
+доступен как `/root/bin/transaq-clickhouse-exporter.bak`.
 
 Вне торговой сессии (10:00–18:50 МСК, будни; вечерняя 19:00–23:50) пустая
 лента — штатное состояние.

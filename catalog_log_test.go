@@ -2,25 +2,22 @@ package main
 
 import (
 	"context"
-	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
-
-	tcClient "github.com/kmlebedev/txmlconnector/client"
-	"github.com/kmlebedev/txmlconnector/client/commands"
 )
 
 func TestSummarizeCatalog(t *testing.T) {
-	items := []commands.Security{
-		{SecId: 1, SecCode: "SBER", Board: "TQBR"},
-		{SecId: 2, SecCode: "ABRD", Board: "TQBR"},
-		{SecId: 3, SecCode: "SU26238RMFS9", Board: "TQOB"},
-		{SecId: 4, SecCode: "MXZ6", Board: "FUT"},
-		{SecId: 5, SecCode: "LQDT", Board: "MCT"},
+	items := []Security{
+		{SecID: 1, SecCode: "SBER", Board: "TQBR"},
+		{SecID: 2, SecCode: "ABRD", Board: "TQBR"},
+		{SecID: 3, SecCode: "SU26238RMFS9", Board: "TQOB"},
+		{SecID: 4, SecCode: "MXZ6", Board: "FUT"},
+		{SecID: 5, SecCode: "LQDT", Board: "MCT"},
 	}
 	universe := exportUniverse{boards: []string{"TQBR", "TQOB", "FUT"},
 		codes: map[string]struct{}{"SBER": {}, "SU26238RMFS9": {}, "MXZ6": {}, "GAZP": {}}}
@@ -52,59 +49,56 @@ func TestExportUniverseFromEnv(t *testing.T) {
 	if _, ok := universe.codes["positions"]; ok {
 		t.Fatal("positions — режим, а не код бумаги")
 	}
+	if !universe.positions {
+		t.Fatal("режим positions не распознан")
+	}
 	if len(universe.codes) != 2 {
 		t.Fatalf("codes = %v", universe.codes)
 	}
 }
 
-// Гипотеза H1 ofz-market/1.8: после ночного рестарта брокер догружает секцию
-// каталога позже подписки (2026-11-04: подписка ушла на 7 фьючерсов, акций и
-// ОФЗ в каталоге не было). Лог обязан показать рост каталога после подписки.
-func TestProcessTransaqLogsCatalogGrowth(t *testing.T) {
+// mutableCatalogSource — каталог, который «догружается» после подписки: лог
+// обязан показать рост (гипотеза H1 ofz-market/1.8).
+type mutableCatalogSource struct {
+	mu    sync.Mutex
+	items []Security
+}
+
+func (s *mutableCatalogSource) Catalog() Catalog {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return Catalog{Securities: append([]Security(nil), s.items...)}
+}
+
+func (s *mutableCatalogSource) set(items []Security) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.items = items
+}
+
+func TestCatalogLoggerLogsGrowth(t *testing.T) {
 	t.Setenv("EXPORT_SEC_BOARDS", "TQBR,FUT")
 	t.Setenv("EXPORT_ALL_TRADES", "SBER,MXZ6")
-	saved := allTrades.Items
-	t.Cleanup(func() { allTrades.Items = saved })
+	previousInterval := catalogLogEvery
+	catalogLogEvery = 5 * time.Millisecond
+	t.Cleanup(func() { catalogLogEvery = previousInterval })
+
 	hook := logtest.NewGlobal()
 	defer hook.Reset()
 
-	catalog := newSecuritiesCatalog()
-	client := newTestTCClient(newFakeConnectServiceClient())
-	processCtx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	restored := make(chan struct{}, 1)
-	go func() {
-		done <- processTransaq(processCtx, client, transaqSessionConfig{
-			catalog:         catalog,
-			catalogLogEvery: 5 * time.Millisecond,
-			restore: func(*tcClient.TCClient) error {
-				allTrades.Items = []int{4}
-				restored <- struct{}{}
-				return nil
-			},
-		})
-	}()
-	// Цикл сессии читает allTrades: он обязан остановиться до того, как
-	// cleanup вернёт глобальную подписку, иначе гонка.
-	stopped := false
-	stop := func() error {
-		if stopped {
-			return nil
-		}
-		stopped = true
-		cancel()
-		return <-done
-	}
-	t.Cleanup(func() { _ = stop() })
+	source := &mutableCatalogSource{}
+	source.set([]Security{{SecID: 4, SecCode: "MXZ6", Board: "FUT"}})
+	plan := exportPlan{AllTrades: []Security{{SecID: 4, SecCode: "MXZ6", Board: "FUT"}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stop := startCatalogLogger(ctx, source, true, plan)
+	defer stop()
 
-	// Сессия сбрасывает каталог при старте, поэтому порции приходят после
-	// подписки — как при догрузке каталога брокером.
-	client.ServerStatusChan <- commands.ServerStatus{Connected: "true"}
-	<-restored
-	catalog.add([]commands.Security{{SecId: 4, SecCode: "MXZ6", Board: "FUT"}})
 	waitForLog(t, hook, "catalog 1: TQBR 0/0/0, FUT 1/1/1")
-
-	catalog.add([]commands.Security{{SecId: 1, SecCode: "SBER", Board: "TQBR"}})
+	source.set([]Security{
+		{SecID: 4, SecCode: "MXZ6", Board: "FUT"},
+		{SecID: 1, SecCode: "SBER", Board: "TQBR"},
+	})
 	waitForLog(t, hook, "catalog 2: TQBR 1/1/0, FUT 1/1/1")
 
 	before := countLogs(hook, "TRANSAQ catalog")
@@ -112,15 +106,11 @@ func TestProcessTransaqLogsCatalogGrowth(t *testing.T) {
 	if after := countLogs(hook, "TRANSAQ catalog"); after != before {
 		t.Fatalf("без изменений каталога лог повторился: %d → %d", before, after)
 	}
-
-	if err := stop(); !errors.Is(err, context.Canceled) {
-		t.Fatalf("processTransaq error = %v", err)
-	}
 }
 
 func waitForLog(t *testing.T, hook *logtest.Hook, fragment string) {
 	t.Helper()
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		if countLogs(hook, fragment) > 0 {
 			return

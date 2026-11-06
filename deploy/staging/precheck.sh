@@ -4,6 +4,7 @@
 set -euo pipefail
 
 SECRETS="${TCE_SECRETS:-/etc/transaq-clickhouse-exporter.env}"
+EXPORT_ENV="${TCE_EXPORT_ENV:-/etc/transaq-clickhouse-exporter.export.env}"
 EXPECTED_KEYS=(TC_LOGIN TC_PASSWORD CLICKHOUSE_URL)
 
 fail() {
@@ -11,14 +12,42 @@ fail() {
     exit 1
 }
 
+env_value() {
+    # $1 — имя переменной; пустое значение, если файла или переменной нет.
+    [ -r "$1" ] || { echo ""; return; }
+    grep -E "^${2}=" "$1" | head -1 | cut -d= -f2- | tr -d '"' || true
+}
+
 [ "$(id -u)" = 0 ] || fail "нужен root на $(hostname)"
 command -v systemctl >/dev/null || fail "нет systemctl"
 command -v clickhouse-client >/dev/null || fail "нет clickhouse-client"
 
-systemctl is-active --quiet txmlconnector-server.service \
-    || fail "txmlconnector-server.service не active: экспортёру некуда подключаться"
-ss -ltn | grep -q ':50051 ' \
-    || fail "порт 50051 не слушается: gRPC-сервер txmlconnector не поднят"
+backend=$(env_value "$EXPORT_ENV" TRANSAQ_BACKEND)
+backend=${backend:-native}
+case "$backend" in
+    native)
+        host=$(env_value "$EXPORT_ENV" TC_HOST)
+        port=$(env_value "$EXPORT_ENV" TC_PORT)
+        host=${host:-tr1.finam.ru}
+        port=${port:-3900}
+        if command -v timeout >/dev/null; then
+            timeout 5 bash -c "exec 3<>/dev/tcp/$host/$port" 2>/dev/null \
+                || fail "нет TCP до TRANSAQ $host:$port (backend native)"
+        else
+            (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null \
+                || fail "нет TCP до TRANSAQ $host:$port (backend native)"
+        fi
+        ;;
+    grpc)
+        systemctl is-active --quiet txmlconnector-server.service \
+            || fail "txmlconnector-server.service не active: экспортёру некуда подключаться"
+        ss -ltn | grep -q ':50051 ' \
+            || fail "порт 50051 не слушается: gRPC-сервер txmlconnector не поднят"
+        ;;
+    *)
+        fail "неизвестный TRANSAQ_BACKEND=$backend (ожидается native или grpc)"
+        ;;
+esac
 
 [ -f "$SECRETS" ] || fail "нет $SECRETS — создаёт владелец (см. deploy/staging/README.md)"
 mode=$(stat -c '%a' "$SECRETS")
@@ -50,4 +79,4 @@ ch_pass=${rest%%@*}
 clickhouse-client --user "$ch_user" --password "$ch_pass" --query 'SELECT 1' >/dev/null \
     || fail "ClickHouse не принял CLICKHOUSE_URL из $SECRETS"
 
-echo "OK   $(hostname): root, txmlconnector active, :50051, $SECRETS (600), ClickHouse отвечает"
+echo "OK   $(hostname): root, backend $backend, $SECRETS (600), ClickHouse отвечает"
