@@ -1,7 +1,5 @@
 # Transaq Clickhouse Exporter
 <img width="1234" height="510" alt="image" src="https://github.com/user-attachments/assets/bca09606-262e-41e4-8bf6-abca38e7c698" />
-![img_2.png](img_2.png)
-![img_1.png](img_1.png)
 
 ## Description
 
