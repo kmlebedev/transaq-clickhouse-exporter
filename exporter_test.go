@@ -263,3 +263,62 @@ func TestCheckSubscriptions(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckExportCoverage(t *testing.T) {
+	codes := map[string]struct{}{}
+	for _, code := range []string{"SBER", "GAZP", "LKOH", "ROSN", "NVTK", "TATN", "MTSS", "MOEX", "PLZL", "YDEX"} {
+		codes[code] = struct{}{}
+	}
+	cfg := exportConfig{AllTradesCodes: codes}
+	withCodes := func(code ...string) exportPlan {
+		plan := exportPlan{}
+		for _, c := range code {
+			plan.AllTrades = append(plan.AllTrades, Security{SecCode: c})
+		}
+		return plan
+	}
+	if err := checkExportCoverage(withCodes("SBER", "GAZP", "LKOH", "ROSN", "NVTK"), cfg); err != nil {
+		t.Fatalf("5 of 10 must pass: %v", err)
+	}
+	if err := checkExportCoverage(withCodes("SBER", "GAZP", "LKOH", "ROSN"), cfg); err == nil {
+		t.Fatal("4 of 10 must fail")
+	}
+	if err := checkExportCoverage(withCodes("OTHER1", "OTHER2"), cfg); err == nil {
+		t.Fatal("non-configured codes must not count")
+	}
+	if err := checkExportCoverage(withCodes("SBER"), exportConfig{AllTradesAll: true}); err != nil {
+		t.Fatalf("ALL mode must skip the ratio: %v", err)
+	}
+	if err := checkExportCoverage(withCodes(), exportConfig{}); err != nil {
+		t.Fatalf("no configured codes must skip the ratio: %v", err)
+	}
+}
+
+func TestRunExporterSessionRejectsPartialCatalog(t *testing.T) {
+	previousConnect := connect
+	recorder := &recordingConn{}
+	connect = recorder
+	defer func() { connect = previousConnect }()
+
+	codes := "SBER,GAZP,LKOH,ROSN,NVTK,TATN,MTSS,MOEX,PLZL,YDEX,MXZ6"
+	t.Setenv("EXPORT_SEC_BOARDS", "TQBR,FUT")
+	t.Setenv("EXPORT_ALL_TRADES", codes)
+	t.Setenv("EXPORT_SEC_CODES", "")
+	t.Setenv("EXPORT_SEC_INFO_NAMES", "")
+
+	// The night-restart partial catalog: only one FUT instrument, no TQBR.
+	catalog := Catalog{Securities: []Security{{
+		SecID: 7, Active: true, SecCode: "MXZ6", Board: "FUT", SecType: "FUT",
+	}}}
+	session := &catalogSession{catalog: catalog, subscribed: make(chan Subscription, 1)}
+	err := runExporterSession(context.Background(), session, exportConfigFromEnv())
+	if err == nil || !strings.Contains(err.Error(), "incomplete") {
+		t.Fatalf("error = %v", err)
+	}
+	if session.subscribedN != 0 {
+		t.Fatal("подписка не должна отправляться на частичном каталоге")
+	}
+	if recorder.query != "" {
+		t.Fatalf("частичный каталог не должен попадать в transaq_securities: %q", recorder.query)
+	}
+}

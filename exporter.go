@@ -108,9 +108,6 @@ func runExporterSession(ctx context.Context, session Session, cfg exportConfig) 
 		catalogSize = len(catalog.Securities)
 		index = newCatalogIndex(catalog)
 		plan = buildExportPlan(catalog, cfg)
-		if err := insertSecurities(ctx, plan.Securities); err != nil {
-			return fmt.Errorf("insert securities: %w", err)
-		}
 	}
 
 	subscriber, canSubscribe := session.(Subscriber)
@@ -130,6 +127,16 @@ func runExporterSession(ctx context.Context, session Session, cfg exportConfig) 
 		if err := checkSubscriptions(catalogSize, len(plan.AllTrades), len(plan.Quotations)); err != nil {
 			return err
 		}
+		if err := checkExportCoverage(plan, cfg); err != nil {
+			return err
+		}
+	}
+	if hasCatalog {
+		if err := insertSecurities(ctx, plan.Securities); err != nil {
+			return fmt.Errorf("insert securities: %w", err)
+		}
+	}
+	if hasCatalog && canSubscribe {
 		if len(plan.AllTrades) > 0 || len(plan.Quotations) > 0 {
 			if err := subscriber.Subscribe(ctx, plan.Subscription()); err != nil {
 				return fmt.Errorf("subscribe: %w", err)
@@ -293,6 +300,26 @@ func appendUniqueSecurity(items []Security, sec Security) []Security {
 func checkSubscriptions(catalog, trades, quotes int) error {
 	if trades == 0 && quotes == 0 {
 		return fmt.Errorf("TRANSAQ catalog is not ready: none of %d securities match the export config", catalog)
+	}
+	return nil
+}
+
+// checkExportCoverage отличает частичный каталог ночного рестарта от полного:
+// если совпала меньше половины кодов EXPORT_ALL_TRADES, сессия пересоздаётся.
+// Без этой проверки каталог из одного FUT-набора (7 из 115 кодов) проходил
+// checkSubscriptions и экспортёр часами писал только фьючерсы.
+func checkExportCoverage(plan exportPlan, cfg exportConfig) error {
+	if cfg.AllTradesAll || len(cfg.AllTradesCodes) == 0 {
+		return nil
+	}
+	matched := 0
+	for _, sec := range plan.AllTrades {
+		if _, ok := cfg.AllTradesCodes[sec.SecCode]; ok {
+			matched++
+		}
+	}
+	if matched*2 < len(cfg.AllTradesCodes) {
+		return fmt.Errorf("TRANSAQ catalog is incomplete: only %d of %d configured alltrades codes matched", matched, len(cfg.AllTradesCodes))
 	}
 	return nil
 }
