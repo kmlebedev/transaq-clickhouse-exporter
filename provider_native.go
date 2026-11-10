@@ -129,7 +129,10 @@ func nativeConfigFromEnv() (native.ClientConfig, error) {
 func init() { RegisterProvider(backendNative, newNativeProvider) }
 
 type nativeSession struct {
-	client      nativeSessionClient
+	client nativeSessionClient
+	// mu guards catalog, index and secBySymbol: the Run goroutine adds late
+	// securities while the catalog logger and sec_info read them.
+	mu          sync.RWMutex
 	catalog     Catalog
 	index       catalogIndex
 	secBySymbol map[Symbol]records.SecNew
@@ -164,6 +167,8 @@ func newNativeSession(client nativeSessionClient) (*nativeSession, error) {
 }
 
 func (s *nativeSession) Catalog() Catalog {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return Catalog{
 		Securities:  append([]Security(nil), s.catalog.Securities...),
 		CandleKinds: append([]CandleKind(nil), s.catalog.CandleKinds...),
@@ -193,6 +198,7 @@ func (s *nativeSession) SecuritiesInfo(ctx context.Context, symbols []Symbol) ([
 		}
 		ids := make([]uint16, 0, end-start)
 		secs := make(map[uint16]records.SecNew, end-start)
+		s.mu.RLock()
 		for _, symbol := range symbols[start:end] {
 			sec, ok := s.secBySymbol[symbol]
 			if !ok {
@@ -201,6 +207,7 @@ func (s *nativeSession) SecuritiesInfo(ctx context.Context, symbols []Symbol) ([
 			ids = append(ids, sec.SecID)
 			secs[sec.SecID] = sec
 		}
+		s.mu.RUnlock()
 		if len(ids) == 0 {
 			continue
 		}
@@ -251,7 +258,7 @@ func (s *nativeSession) Positions() []Symbol {
 	out := make([]Symbol, 0, len(positions))
 	seen := make(map[Symbol]struct{}, len(positions))
 	for _, position := range positions {
-		symbol, ok := s.index.symbolByID(int(position.SecID))
+		symbol, ok := s.symbolByID(int(position.SecID))
 		if !ok {
 			continue
 		}
@@ -296,6 +303,39 @@ func (s *nativeSession) Close() error {
 		s.closeErr = s.client.Close()
 	})
 	return s.closeErr
+}
+
+// addSecurities adds the securities the client reported after Dial and
+// returns the ones the session did not know. It runs in the Run goroutine,
+// the only one that mutates the client catalog, so the raw R_SEC_NEW lookup
+// is safe here.
+func (s *nativeSession) addSecurities(items []model.Security) []Security {
+	raw := s.client.Catalog()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var added []Security
+	for _, item := range items {
+		if _, known := s.index.byID[item.SecID]; known {
+			continue
+		}
+		sec := securityFromModel(item)
+		s.catalog.Securities = append(s.catalog.Securities, sec)
+		s.index.byID[sec.SecID] = sec
+		s.index.bySymbol[sec.Symbol()] = sec
+		if raw != nil {
+			if rec, ok := raw.Security(uint16(item.SecID)); ok {
+				s.secBySymbol[sec.Symbol()] = rec
+			}
+		}
+		added = append(added, sec)
+	}
+	return added
+}
+
+func (s *nativeSession) symbolByID(secID int) (Symbol, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.index.symbolByID(secID)
 }
 
 func (s *nativeSession) normalize(event model.Event) (Event, bool) {
@@ -354,14 +394,20 @@ func (s *nativeSession) normalize(event model.Event) (Event, bool) {
 			normalized.Quantity = int(*event.Fields.Quantity)
 		}
 		return normalized, true
+	case *model.SecuritiesAdded:
+		added := s.addSecurities(event.Items)
+		if len(added) == 0 {
+			return nil, false
+		}
+		return CatalogAddedEvent{Securities: added}, true
 	case *model.SecPosition:
-		symbol, ok := s.index.symbolByID(int(event.SecID))
+		symbol, ok := s.symbolByID(int(event.SecID))
 		if !ok {
 			return nil, false
 		}
 		return PositionEvent{Symbol: symbol}, true
 	case *model.SecInfoUpdate:
-		symbol, ok := s.index.symbolByID(int(event.SecID))
+		symbol, ok := s.symbolByID(int(event.SecID))
 		if !ok {
 			return nil, false
 		}

@@ -167,6 +167,12 @@ func runExporterSession(ctx context.Context, session Session, cfg exportConfig) 
 
 	dispatcher := newEventDispatcher(ctx, cfg, subscriber, plan.Subscription().AllTrades)
 	defer dispatcher.Close()
+	subscribedIDs := newSecIDSet(plan.subscribedSecIDs())
+	if hasCatalog {
+		dispatcher.catalogAdded = func(added []Security) error {
+			return subscribeLateCatalog(ctx, session, cfg, catalogSource.Catalog().CandleKinds, added, subscribedIDs)
+		}
+	}
 
 	historyCtx, cancelHistory := context.WithCancel(ctx)
 	var historyWG sync.WaitGroup
@@ -182,7 +188,7 @@ func runExporterSession(ctx context.Context, session Session, cfg exportConfig) 
 		}
 	}
 
-	stopCatalogLog := startCatalogLogger(ctx, catalogSource, hasCatalog, plan)
+	stopCatalogLog := startCatalogLogger(ctx, catalogSource, hasCatalog, subscribedIDs)
 	defer stopCatalogLog()
 	runErr := session.Run(ctx, dispatcher.Handle)
 	cancelHistory()
@@ -243,14 +249,12 @@ func runHistoryRequests(ctx context.Context, source HistorySource, plan exportPl
 // startCatalogLogger logs the catalog summary at session start and then once
 // per interval while the session is running. The returned function stops the
 // goroutine and waits for it, so a test may safely restore catalogLogEvery.
-func startCatalogLogger(ctx context.Context, source CatalogSource, hasCatalog bool, plan exportPlan) func() {
+func startCatalogLogger(ctx context.Context, source CatalogSource, hasCatalog bool, subscribed *secIDSet) func() {
 	if !hasCatalog || source == nil {
 		return func() {}
 	}
 	logger := &catalogLogger{}
-	subscribed := plan.subscribedSecIDs()
-	items := source.Catalog().Securities
-	logger.log(items, subscribed, time.Now())
+	logger.log(source.Catalog().Securities, subscribed.snapshot(), time.Now())
 
 	interval := catalogLogEvery
 	stop := make(chan struct{})
@@ -267,7 +271,7 @@ func startCatalogLogger(ctx context.Context, source CatalogSource, hasCatalog bo
 			case <-stop:
 				return
 			case now := <-ticker.C:
-				logger.log(source.Catalog().Securities, subscribed, now)
+				logger.log(source.Catalog().Securities, subscribed.snapshot(), now)
 			}
 		}
 	}()

@@ -251,6 +251,16 @@ type StatusEvent struct {
 
 func (StatusEvent) isEvent() {}
 
+// CatalogAddedEvent carries securities the source added to its catalog after
+// the session opened. After a night restart the broker sends the catalog in
+// sections (2026-11-10: the session opened on FUT only, TQBR and TQOB came
+// later), so the exporter subscribes to the late part of the universe.
+type CatalogAddedEvent struct {
+	Securities []Security
+}
+
+func (CatalogAddedEvent) isEvent() {}
+
 // UnknownEvent is a source record the provider could not decode.
 type UnknownEvent struct {
 	Tag    byte

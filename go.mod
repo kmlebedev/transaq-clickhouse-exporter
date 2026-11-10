@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.48.0
-	github.com/kmlebedev/txmlconnector v1.26.13-0.20261106054048-dd38d9361a42
+	github.com/kmlebedev/txmlconnector v1.26.13-0.20261110070232-765bac3ece9e
 	github.com/sirupsen/logrus v1.10.0
 	google.golang.org/grpc v1.84.0
 )

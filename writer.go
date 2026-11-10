@@ -148,6 +148,9 @@ type eventDispatcher struct {
 	quotations chan QuotationEvent
 	candles    chan CandlesEvent
 	positions  *positionSubscriber
+	// catalogAdded handles CatalogAddedEvent in the session goroutine; an
+	// error ends the session so the supervisor reopens it.
+	catalogAdded func([]Security) error
 }
 
 func newEventDispatcher(parent context.Context, cfg exportConfig, sub Subscriber, subscribed []Symbol) *eventDispatcher {
@@ -190,6 +193,10 @@ func (d *eventDispatcher) Handle(event Event) error {
 	case PositionEvent:
 		if d.cfg.Positions && d.positions != nil {
 			d.positions.Add(event.Symbol)
+		}
+	case CatalogAddedEvent:
+		if d.catalogAdded != nil {
+			return d.catalogAdded(event.Securities)
 		}
 	case SecInfoUpdateEvent:
 		log.Debugf("secInfoUpd %s", event.Symbol)
