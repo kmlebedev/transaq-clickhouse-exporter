@@ -10,6 +10,7 @@ import (
 	"github.com/kmlebedev/txmlconnector/native/model"
 	"github.com/kmlebedev/txmlconnector/native/records"
 	"github.com/kmlebedev/txmlconnector/native/wire"
+	"github.com/kmlebedev/txmlconnector/native/xmlcompat"
 )
 
 func testNativeCatalog() *records.Catalog {
@@ -323,5 +324,43 @@ func TestNativeSessionHistory(t *testing.T) {
 	}
 	if len(candles) != 1 || candles[0].Close != 1.01 || candles[0].Volume != 10 {
 		t.Fatalf("candles = %+v", candles)
+	}
+}
+
+// The native client reports securities that arrive after Dial as
+// model.SecuritiesAdded; the session adds them to its catalog (so the catalog
+// log and sec_info see them) and hands them to the exporter once.
+func TestNativeSessionNormalizeSecuritiesAdded(t *testing.T) {
+	session, fake := newTestNativeSession(t)
+	gazp := records.SecNew{
+		SecID: 2, Market: 1, Class: 'E', SecCode: "GAZP", ShortName: "Газпром", Flags: 3,
+		Pits: []records.Pit{{Board: 1, LotSize: 10, LotDivider: 1, MinStep: 1, Decimals: 2, Default: true, PointCost: 1}},
+	}
+	fake.catalog.AddSecurity(gazp)
+	added := &model.SecuritiesAdded{Items: []model.Security{xmlcompat.Security(fake.catalog.Startup(), gazp)}}
+
+	event, ok := session.normalize(added)
+	if !ok {
+		t.Fatal("SecuritiesAdded not normalized")
+	}
+	got, ok := event.(CatalogAddedEvent)
+	if !ok || len(got.Securities) != 1 || got.Securities[0].SecCode != "GAZP" || got.Securities[0].Board != "TQBR" {
+		t.Fatalf("event = %#v, want CatalogAddedEvent with GAZP on TQBR", event)
+	}
+	if catalog := session.Catalog(); len(catalog.Securities) != 2 {
+		t.Fatalf("session catalog = %+v, want SBER and GAZP", catalog.Securities)
+	}
+	if _, ok := session.secBySymbol[Symbol{Board: "TQBR", SecCode: "GAZP"}]; !ok {
+		t.Fatal("GAZP missing from secBySymbol: sec_info for a late bond would be skipped")
+	}
+	if symbol, ok := session.index.symbolByID(2); !ok || symbol.SecCode != "GAZP" {
+		t.Fatalf("index has no secid 2: %+v", symbol)
+	}
+
+	if event, ok := session.normalize(added); ok {
+		t.Fatalf("repeated SecuritiesAdded produced %#v, want nothing new", event)
+	}
+	if catalog := session.Catalog(); len(catalog.Securities) != 2 {
+		t.Fatalf("repeat duplicated the catalog: %+v", catalog.Securities)
 	}
 }

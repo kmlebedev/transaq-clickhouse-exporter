@@ -91,7 +91,7 @@ func TestCatalogLoggerLogsGrowth(t *testing.T) {
 	plan := exportPlan{AllTrades: []Security{{SecID: 4, SecCode: "MXZ6", Board: "FUT"}}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stop := startCatalogLogger(ctx, source, true, plan)
+	stop := startCatalogLogger(ctx, source, true, newSecIDSet(plan.subscribedSecIDs()))
 	defer stop()
 
 	waitForLog(t, hook, "catalog 1: TQBR 0/0/0, FUT 1/1/1")
